@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <Resource Include="assets\app.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="installer\**\*.cs" />
+    <Page Remove="installer\**\*.xaml" />
+    <ApplicationDefinition Remove="installer\**\*.xaml" />
+    <EmbeddedResource Remove="installer\**\*" />
+  </ItemGroup>
+</Project>
+

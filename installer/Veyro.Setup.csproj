@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup>
+  <OutputType>WinExe</OutputType>
+  <TargetFramework>net8.0-windows</TargetFramework>
+  <UseWPF>true</UseWPF>
+  <UseWindowsForms>true</UseWindowsForms>
+  <Nullable>enable</Nullable>
+  <ImplicitUsings>disable</ImplicitUsings>
+  <AssemblyName Condition="'$(UninstallerBuild)' != 'true'">Veyro-Setup</AssemblyName>
+  <AssemblyName Condition="'$(UninstallerBuild)' == 'true'">Uninstall-Veyro</AssemblyName>
+  <ApplicationIcon>..\assets\app.ico</ApplicationIcon>
+ </PropertyGroup>
+ <ItemGroup>
+  <Resource Include="..\assets\app.ico" Link="app.ico"/>
+  <EmbeddedResource Condition="'$(UninstallerBuild)' != 'true'" Include="payload.zip" LogicalName="Veyro.Payload"/>
+ </ItemGroup>
+</Project>
+

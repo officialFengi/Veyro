@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <Product>Veyro</Product>
+    <Company>Fengible</Company>
+    <Authors>officialFengi</Authors>
+    <Copyright>Copyright (c) 2026 Fengible</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/officialFengi/Veyro</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

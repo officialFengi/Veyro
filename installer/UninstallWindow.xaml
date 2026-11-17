@@ -1,0 +1,33 @@
+<Window x:Class="VeyroSetup.UninstallWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Удаление Veyro" Icon="app.ico" Width="540" Height="430" WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent" Foreground="#F3EFF4" FontFamily="Segoe UI">
+ <Window.Resources>
+  <Style TargetType="Button">
+   <Setter Property="Background" Value="#2C2830"/><Setter Property="Foreground" Value="#F3EFF4"/><Setter Property="Cursor" Value="Hand"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+    <Border x:Name="Plate" Background="{TemplateBinding Background}" CornerRadius="12" Padding="18,13"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+    <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Plate" Property="Opacity" Value="0.8"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Plate" Property="Opacity" Value="0.4"/></Trigger></ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+ </Window.Resources>
+ <Border CornerRadius="24" BorderBrush="#43333E" BorderThickness="1" Padding="32">
+  <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#30212B"/><GradientStop Color="#19171D" Offset="0.55"/></LinearGradientBrush></Border.Background>
+  <Grid>
+   <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <StackPanel>
+    <DockPanel MouseLeftButtonDown="DragHeader" Background="Transparent">
+     <Image Source="app.ico" Width="68" Height="68" Margin="0,0,16,0"/>
+     <TextBlock Text="Veyro" FontSize="26" FontWeight="SemiBold" VerticalAlignment="Center"/>
+    </DockPanel>
+    <TextBlock x:Name="Heading" Text="Удалить Veyro?" FontSize="30" FontWeight="SemiBold" Margin="0,28,0,12"/>
+    <TextBlock x:Name="Description" Text="Приложение, ярлыки и автозапуск будут удалены. Ваши темы и настройки сохранятся для следующей установки." TextWrapping="Wrap" FontSize="14" Foreground="#BFB2C3" LineHeight="23"/>
+    <ProgressBar x:Name="Progress" Height="5" IsIndeterminate="True" Visibility="Collapsed" Foreground="#D66070" Background="#382B35" BorderThickness="0" Margin="0,24,0,0"/>
+    <TextBlock x:Name="Status" FontSize="12" Foreground="#E5A1AC" TextWrapping="Wrap" Margin="0,12,0,0"/>
+   </StackPanel>
+   <Grid Grid.Row="1">
+    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+    <Button x:Name="CancelButton" Content="Оставить Veyro" Click="Cancel" FontSize="14"/>
+    <Button x:Name="DeleteButton" Grid.Column="2" Content="Да, удалить" Background="#A83E50" Click="Delete" FontSize="14"/>
+   </Grid>
+  </Grid>
+ </Border>
+</Window>

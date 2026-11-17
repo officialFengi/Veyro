@@ -1,0 +1,428 @@
+<Window x:Class="Veyro.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Veyro"
+        Title="Veyro" Icon="assets/app.ico" Width="560" ShowInTaskbar="False" Topmost="True" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize"
+        Background="Transparent" WindowStartupLocation="Manual"
+        FontFamily="Segoe UI" Foreground="{DynamicResource Ink}" UseLayoutRounding="True">
+    <Window.Resources>
+        <SolidColorBrush x:Key="Panel" Color="#1C1C1B"/>
+        <SolidColorBrush x:Key="Surface" Color="#292929"/>
+        <SolidColorBrush x:Key="Stroke" Color="#444443"/>
+        <SolidColorBrush x:Key="Ink" Color="#F1F4FB"/>
+        <SolidColorBrush x:Key="Secondary" Color="#AAAAAA"/>
+        <SolidColorBrush x:Key="Accent" Color="#3297FF"/>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource Surface}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Plate" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="2" CornerRadius="16">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{DynamicResource Surface}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{DynamicResource Stroke}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="VolumeSlider" TargetType="local:VolumeSlider">
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="SmallChange" Value="1"/>
+            <Setter Property="LargeChange" Value="10"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="local:VolumeSlider">
+                        <Border x:Name="Outline" Background="{DynamicResource Surface}" CornerRadius="42"
+                                BorderBrush="Transparent" BorderThickness="1" Padding="17">
+                            <Grid>
+                                <ProgressBar Value="{TemplateBinding Value}" Maximum="100"
+                                             IsHitTestVisible="False">
+                                    <ProgressBar.Template>
+                                        <ControlTemplate TargetType="ProgressBar">
+                                            <Grid x:Name="PART_Track">
+                                                <Border x:Name="PART_Indicator" Background="{DynamicResource Accent}"
+                                                        CornerRadius="24" HorizontalAlignment="Left"/>
+                                            </Grid>
+                                        </ControlTemplate>
+                                    </ProgressBar.Template>
+                                </ProgressBar>
+                                <Track x:Name="PART_Track" Minimum="0" Maximum="100"
+                                       Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
+                                       Opacity="0">
+                                    <Track.Thumb>
+                                        <Thumb Width="0" IsHitTestVisible="False"/>
+                                    </Track.Thumb>
+                                </Track>
+                                <TextBlock Text="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, StringFormat={}{0:0}}"
+                                           FontSize="26" Foreground="{DynamicResource Ink}" Margin="18,0,0,0"
+                                           VerticalAlignment="Center" IsHitTestVisible="False"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Outline" Property="BorderBrush" Value="#7DBDFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True" Orientation="Vertical">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False"/>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb MinHeight="24">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border x:Name="Grip" Background="#465368" CornerRadius="3" Width="5" HorizontalAlignment="Right"/>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Grip" Property="Background" Value="#7488A5"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="DeviceMenu" TargetType="ContextMenu">
+            
+    <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Stroke}" BorderThickness="1"
+                    CornerRadius="16" Padding="8" Width="370">
+                <StackPanel>
+                    <TextBlock Text="Устройство вывода" Foreground="{DynamicResource Secondary}"
+                               Margin="12,6,12,8" FontSize="12" FontWeight="SemiBold"/>
+                    <ScrollViewer MaxHeight="310" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+        </ControlTemplate>
+
+        <Style x:Key="DeviceOption" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Plate" Margin="0,1" Padding="11,8" MinHeight="40"
+                                CornerRadius="9" Background="Transparent">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="22"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Path x:Name="Check" Visibility="Hidden" VerticalAlignment="Center"
+                                      Data="M 1,6 L 5,10 L 12,2" Stroke="{DynamicResource Accent}"
+                                      StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <TextBlock Grid.Column="1" Text="{TemplateBinding Header}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" FontSize="13"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{DynamicResource Surface}"/>
+                                <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{DynamicResource Surface}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource Secondary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="MixerRow">
+            <Grid x:Name="ChannelRow" Height="84" Margin="0,0,0,29" MouseRightButtonUp="ShowSorting">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="358"/>
+                    <ColumnDefinition Width="30"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border x:Name="ChannelLabel" Background="{DynamicResource Surface}" BorderBrush="Transparent" BorderThickness="2" CornerRadius="42" Padding="23,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="58"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Width="48" Height="48" Background="Transparent" Click="ToggleMute"
+                                ToolTip="{Binding MuteHint}" AutomationProperties.Name="{Binding MuteHint}">
+                            <Grid Width="42" Height="42">
+                                <Image Source="{Binding Icon}" Width="40" Height="40"/>
+                                <TextBlock Text="{Binding Glyph}" FontFamily="Segoe MDL2 Assets" FontSize="32"
+                                           Foreground="{DynamicResource Ink}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Button>
+                        <StackPanel Grid.Column="1" Margin="17,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="DeviceCaption" Text="Устройство вывода" Visibility="Collapsed"
+                                       Foreground="{DynamicResource Secondary}" FontSize="16" Margin="0,0,0,4"/>
+                            <TextBlock PreviewMouseLeftButtonDown="BeginReorder" PreviewMouseMove="MoveReorder" PreviewMouseLeftButtonUp="FinishReorder" LostMouseCapture="CancelReorder" PreviewMouseWheel="ScrollReorder" Cursor="Hand" x:Name="ChannelName" Text="{Binding Name}" ToolTip="{Binding Name}" MouseLeftButtonUp="ToggleGroup"
+                                       FontSize="28" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border x:Name="DropMarker" Grid.ColumnSpan="3" Height="3" Background="{DynamicResource Accent}" VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"/>
+                <Border x:Name="DeviceDivider" Grid.ColumnSpan="3" Height="1" Background="{DynamicResource Stroke}"
+                        VerticalAlignment="Bottom" Margin="20,0,20,-20" Visibility="Collapsed" IsHitTestVisible="False"/>
+                <local:VolumeSlider Grid.Column="2" Style="{StaticResource VolumeSlider}"
+                                    Value="{Binding Volume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    AutomationProperties.Name="{Binding Name}" PreviewMouseWheel="AdjustWithWheel"/>
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Key}" Value="master">
+                    <Setter TargetName="DeviceCaption" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="ChannelLabel" Property="Background" Value="Transparent"/>
+                    <Setter TargetName="ChannelName" Property="FontSize" Value="23"/>
+                    <Setter TargetName="ChannelRow" Property="Margin" Value="0,0,0,42"/>
+                    <Setter TargetName="DeviceDivider" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </Window.Resources>
+    <AdornerDecorator>
+    
+    <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Stroke}" BorderThickness="7" CornerRadius="40"
+            Padding="40,32,46,16">
+        <Border.LayoutTransform><ScaleTransform x:Name="InterfaceScale" ScaleX="0.606" ScaleY="0.606"/></Border.LayoutTransform>
+        <StackPanel>
+            <Grid x:Name="MixerHeader" Margin="0,0,0,37">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="62"/><ColumnDefinition Width="50"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Veyro" FontSize="38" FontWeight="SemiBold"
+                           Background="Transparent" MouseLeftButtonDown="DragHeader" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Width="48" Height="48" Background="Transparent" Click="ToggleSettings" ToolTip="Настройки" AutomationProperties.Name="Настройки"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="30"/></Button>
+                <Button x:Name="OutputButton" Grid.Column="2" Width="48" Height="48"
+                        Background="Transparent" Click="ShowOutputs" ToolTip="Устройство вывода"
+                        AutomationProperties.Name="Устройство вывода">
+                    <Viewbox Width="30" Height="34">
+                        <Canvas Width="30" Height="34">
+                            <Path Data="M 12,5 C 4,0 2,6 2,11 L 2,23 C 2,33 14,33 14,23 L 14,11 C 14,1 26,1 26,11 L 26,28"
+                                  Stroke="{DynamicResource Ink}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            <Path Data="M 2,12 L 8,12 M 20,26 L 26,26" Stroke="{DynamicResource Ink}" StrokeThickness="4"/>
+                        </Canvas>
+                    </Viewbox>
+                </Button>
+            </Grid>
+            <Border x:Name="SettingsPanel" Visibility="Collapsed">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,24">
+                        <Button Content="←" Click="ToggleSettings" Width="52" Height="52" FontSize="30" ToolTip="Вернуться к микшеру" Margin="0,0,18,0"/>
+                        <TextBlock Text="Настройки" FontSize="34" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <ScrollViewer MaxHeight="650" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="0,0,8,0">
+                        <TextBlock Text="Тема" FontSize="23" FontWeight="SemiBold" Margin="0,0,0,14"/>
+                        <UniformGrid Columns="4" x:Name="ThemeChoices">
+<Button x:Name="ThemeGraphite" Tag="Graphite" Click="SelectTheme" Margin="0,0,12,0" Background="{DynamicResource Surface}">
+ <StackPanel Margin="12">
+  <Border Background="#1C1C1B" CornerRadius="12" Height="82" Padding="12">
+   <StackPanel VerticalAlignment="Center">
+    <Border Height="12" Width="52" Background="#292929" HorizontalAlignment="Left" CornerRadius="6" Margin="0,0,0,10"/>
+    <Border Height="18" Background="#292929" CornerRadius="9">
+     <Border Width="65" HorizontalAlignment="Left" Background="#3297FF" CornerRadius="9"/>
+    </Border>
+   </StackPanel>
+  </Border>
+  <TextBlock Text="Графит" FontSize="20" Margin="0,12,0,2" HorizontalAlignment="Center"/>
+ </StackPanel>
+</Button><Button x:Name="ThemePearl" Tag="Pearl" Click="SelectTheme" Margin="0,0,12,0" Background="{DynamicResource Surface}">
+ <StackPanel Margin="12">
+  <Border Background="#F4F1EC" CornerRadius="12" Height="82" Padding="12">
+   <StackPanel VerticalAlignment="Center">
+    <Border Height="12" Width="52" Background="#E2DED7" HorizontalAlignment="Left" CornerRadius="6" Margin="0,0,0,10"/>
+    <Border Height="18" Background="#E2DED7" CornerRadius="9">
+     <Border Width="65" HorizontalAlignment="Left" Background="#9CBDEC" CornerRadius="9"/>
+    </Border>
+   </StackPanel>
+  </Border>
+  <TextBlock Text="Жемчуг" FontSize="20" Margin="0,12,0,2" HorizontalAlignment="Center"/>
+ </StackPanel>
+</Button><Button x:Name="ThemeIris" Tag="Iris" Click="SelectTheme" Margin="0,0,12,0" Background="{DynamicResource Surface}">
+ <StackPanel Margin="12">
+  <Border Background="#201A30" CornerRadius="12" Height="82" Padding="12">
+   <StackPanel VerticalAlignment="Center">
+    <Border Height="12" Width="52" Background="#30263F" HorizontalAlignment="Left" CornerRadius="6" Margin="0,0,0,10"/>
+    <Border Height="18" Background="#30263F" CornerRadius="9">
+     <Border Width="65" HorizontalAlignment="Left" Background="#985ADD" CornerRadius="9"/>
+    </Border>
+   </StackPanel>
+  </Border>
+  <TextBlock Text="Ирис" FontSize="20" Margin="0,12,0,2" HorizontalAlignment="Center"/>
+ </StackPanel>
+</Button><Button x:Name="ThemeForest" Tag="Forest" Click="SelectTheme" Margin="0,0,12,0" Background="{DynamicResource Surface}">
+ <StackPanel Margin="12">
+  <Border Background="#14231E" CornerRadius="12" Height="82" Padding="12">
+   <StackPanel VerticalAlignment="Center">
+    <Border Height="12" Width="52" Background="#24362E" HorizontalAlignment="Left" CornerRadius="6" Margin="0,0,0,10"/>
+    <Border Height="18" Background="#24362E" CornerRadius="9">
+     <Border Width="65" HorizontalAlignment="Left" Background="#377F60" CornerRadius="9"/>
+    </Border>
+   </StackPanel>
+  </Border>
+  <TextBlock Text="Хвоя" FontSize="20" Margin="0,12,0,2" HorizontalAlignment="Center"/>
+ </StackPanel>
+</Button>
+                        </UniformGrid>
+                        <Button Content="✦  Своя тема" Click="OpenThemeEditor" FontSize="21" Height="54" Margin="0,14,12,0"/>
+                        <TextBlock Text="Размер интерфейса" FontSize="23" FontWeight="SemiBold" Margin="0,26,0,14"/>
+                        <UniformGrid Columns="3">
+                            <Button x:Name="Size460" Content="Компактный" Tag="460" Click="SelectSize" Height="54" Margin="0,0,12,0" FontSize="20"/>
+                            <Button x:Name="Size560" Content="Обычный" Tag="560" Click="SelectSize" Height="54" Margin="0,0,12,0" FontSize="20"/>
+                            <Button x:Name="Size660" Content="Крупный" Tag="660" Click="SelectSize" Height="54" Margin="0,0,12,0" FontSize="20"/>
+                        </UniformGrid>
+                        <Border Background="{DynamicResource Surface}" CornerRadius="20" Padding="22" Margin="0,26,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,20,0">
+                                    <TextBlock Text="Умная сортировка" FontSize="23" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Собирает приложения в папки с общей громкостью" TextWrapping="Wrap" FontSize="18" Foreground="{DynamicResource Secondary}" Margin="0,7,0,0"/>
+                                </StackPanel>
+                                <Button x:Name="SmartSortButton" Grid.Column="1" Click="ToggleSmartSort" Height="46" FontSize="19" VerticalAlignment="Center" AutomationProperties.Name="Умная сортировка">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Track" Width="76" Height="40" CornerRadius="20" Background="{DynamicResource Stroke}" Padding="5">
+                                                <Ellipse x:Name="Knob" Width="30" Height="30" Fill="{DynamicResource Ink}" HorizontalAlignment="Left"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="Tag" Value="True">
+                                                    <Setter TargetName="Track" Property="Background" Value="{DynamicResource Accent}"/>
+                                                    <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Ink}"/>
+                                                    <Setter TargetName="Track" Property="BorderThickness" Value="2"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </Grid>
+                        </Border>
+                        <Border Background="{DynamicResource Surface}" CornerRadius="20" Padding="22" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Свои папки" FontSize="23" FontWeight="SemiBold"/>
+                                <TextBlock Text="Назначайте приложения правой кнопкой в микшере" FontSize="18" Foreground="{DynamicResource Secondary}" Margin="0,7,0,16"/>
+                                <DockPanel>
+                                    <Button Content="+  Создать" Click="CreateGroup" DockPanel.Dock="Right" Width="155" FontSize="20" Background="{DynamicResource Panel}"/>
+                                    <Border CornerRadius="12" Background="{DynamicResource Panel}" Padding="14,10" Margin="0,0,12,0">
+                                        <TextBox x:Name="NewGroupName" MaxLength="32" FontSize="21" BorderThickness="0"
+                                                 Background="Transparent" Foreground="{DynamicResource Ink}" CaretBrush="{DynamicResource Ink}" ToolTip="Название папки"/>
+                                    </Border>
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="Папки" FontSize="23" FontWeight="SemiBold" Margin="0,22,0,12"/>
+                        <TextBlock Text="При удалении папки приложения останутся в общем списке." FontSize="18" TextWrapping="Wrap" Foreground="{DynamicResource Secondary}" Margin="0,0,0,12"/>
+                        <StackPanel x:Name="FolderManagement"/>
+                        <TextBlock x:Name="SettingsSummary" FontSize="17" Foreground="{DynamicResource Secondary}" Margin="2,16,0,8"/>
+                    </StackPanel>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+            <Border x:Name="FolderPanel" Visibility="Collapsed">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,22">
+                        <Button Content="←" Click="CloseFolderPicker" Width="52" Height="52" FontSize="30" Margin="0,0,18,0" ToolTip="Назад"/>
+                        <StackPanel>
+                            <TextBlock Text="Выбрать папку" FontSize="32" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="FolderAppName" FontSize="19" Foreground="{DynamicResource Secondary}" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <UniformGrid Columns="2" Margin="0,0,0,16">
+                        <Button Content="↑  Выше в списке" Tag="-1" Click="MoveFromPicker" Height="48" FontSize="19" Margin="0,0,8,0"/>
+                        <Button Content="↓  Ниже в списке" Tag="1" Click="MoveFromPicker" Height="48" FontSize="19"/>
+                    </UniformGrid>
+                    <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="FolderOptions" Margin="0,0,8,0"/>
+                    </ScrollViewer>
+                    <Border Background="{DynamicResource Surface}" CornerRadius="18" Padding="18" Margin="0,18,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Новая папка" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                            <DockPanel>
+                                <Button Content="Создать и выбрать" Click="CreateAndAssignFolder" DockPanel.Dock="Right" Width="225" FontSize="19"/>
+                                <Border Background="{DynamicResource Panel}" CornerRadius="12" Padding="12,10" Margin="0,0,12,0">
+                                    <TextBox x:Name="FolderNameInput" MaxLength="32" FontSize="21" BorderThickness="0" Background="Transparent"
+                                             Foreground="{DynamicResource Ink}" CaretBrush="{DynamicResource Ink}" ToolTip="Название папки"/>
+                                </Border>
+                            </DockPanel>
+                            <TextBlock x:Name="FolderFeedback" FontSize="18" Foreground="{DynamicResource Secondary}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+            <ScrollViewer x:Name="SessionScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="565">
+                <ItemsControl x:Name="MixerRows" ItemTemplate="{StaticResource MixerRow}"/>
+            </ScrollViewer>
+            <TextBlock x:Name="Status" Foreground="{DynamicResource Secondary}" FontSize="16" TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </StackPanel>
+    </Border>
+    </AdornerDecorator>
+</Window>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

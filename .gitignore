@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+/publish/
+/dist/
+/.vs/
+/installer/uninstaller-publish/
+/installer/payload.zip
+*.user
+*.suo
+*.pfx
+*.p12
+*.key
+.env
+.env.*

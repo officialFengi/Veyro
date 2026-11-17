@@ -158,3 +158,40 @@
 Сделай звук своим.
 
 </div>
+
+## Open source / Открытый код
+
+Veyro is open source under the [MIT license](LICENSE). The repository includes
+the audio mixer, custom installer and uninstaller. Third-party dependencies
+retain their own licenses; see [third-party notices](THIRD-PARTY-NOTICES.md).
+
+### Build from source
+
+Requirements: Windows 10/11 x64, .NET 8 SDK and PowerShell with Compress-Archive.
+From the repository root:
+
+```powershell
+./installer/build.ps1
+```
+
+This builds `publish/Veyro.exe`,
+`installer/uninstaller-publish/Uninstall-Veyro.exe`, and `dist/Veyro-Setup.exe`.
+The installer payload is generated locally from the app and uninstaller; no
+prebuilt payload is required. Building does not install or launch the app.
+
+GitHub Actions performs the same build on a Windows runner. Download the
+`Veyro-windows-x64-unsigned` artifact from a successful workflow run. These builds
+are unsigned and may display SmartScreen warnings. Published user downloads are
+available on the [Releases page](https://github.com/officialFengi/Veyro/releases).
+
+### Code signing policy
+
+See [Code signing policy](docs/CODE_SIGNING.md) for maintainer roles, privacy and
+release requirements. SignPath onboarding is being prepared; signing has not
+yet been approved or enabled.
+
+### Contributing
+
+Describe bugs with your Windows version, Veyro version and reproduction steps.
+Keep private information out of screenshots and logs. Submit focused pull
+requests; contributions are reviewed by the maintainer and licensed under MIT.
