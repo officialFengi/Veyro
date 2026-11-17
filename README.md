@@ -187,7 +187,7 @@ available on the [Releases page](https://github.com/officialFengi/Veyro/releases
 ### Code signing policy
 
 See [Code signing policy](docs/CODE_SIGNING.md) for maintainer roles, privacy and
-release requirements. SignPath onboarding is being prepared; signing has not
+release requirements. A SignPath application was submitted on 2026-11-17; signing has not
 yet been approved or enabled.
 
 ### Contributing

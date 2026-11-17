@@ -2,9 +2,8 @@
 
 ## Current status
 
-Veyro releases are currently unsigned. We are preparing an application for
-SignPath Foundation's free open-source signing program. Acceptance and a
-certificate have not been granted. No release should be described as signed
+Veyro releases are currently unsigned. An application to SignPath Foundation's free open-source signing program was
+submitted on 2026-11-17. Acceptance and a certificate have not been granted. No release should be described as signed
 until its Authenticode signature has been verified.
 
 ## Maintainer roles
