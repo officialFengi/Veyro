@@ -59,7 +59,7 @@
                                     <ProgressBar.Template>
                                         <ControlTemplate TargetType="ProgressBar">
                                             <Grid x:Name="PART_Track">
-                                                <Border x:Name="PART_Indicator" Background="{DynamicResource Accent}"
+                                                <Border x:Name="PART_Indicator" Background="{DynamicResource ElementAccent}"
                                                         CornerRadius="24" HorizontalAlignment="Left"/>
                                             </Grid>
                                         </ControlTemplate>
@@ -119,7 +119,7 @@
         </Style>
 
         <ControlTemplate x:Key="DeviceMenu" TargetType="ContextMenu">
-            
+
     <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Stroke}" BorderThickness="1"
                     CornerRadius="16" Padding="8" Width="370">
                 <StackPanel>
@@ -207,7 +207,7 @@
                                     AutomationProperties.Name="{Binding Name}" PreviewMouseWheel="AdjustWithWheel"/>
             </Grid>
             <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding Key}" Value="master">
+                <DataTrigger Binding="{Binding IsOutput}" Value="True">
                     <Setter TargetName="DeviceCaption" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="ChannelLabel" Property="Background" Value="Transparent"/>
                     <Setter TargetName="ChannelName" Property="FontSize" Value="23"/>
@@ -216,40 +216,13 @@
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
-    </Window.Resources>
-    <AdornerDecorator>
-    
-    <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Stroke}" BorderThickness="7" CornerRadius="40"
-            Padding="40,32,46,16">
-        <Border.LayoutTransform><ScaleTransform x:Name="InterfaceScale" ScaleX="0.606" ScaleY="0.606"/></Border.LayoutTransform>
-        <StackPanel>
-            <Grid x:Name="MixerHeader" Margin="0,0,0,37">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="62"/><ColumnDefinition Width="50"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="Veyro" FontSize="38" FontWeight="SemiBold"
-                           Background="Transparent" MouseLeftButtonDown="DragHeader" VerticalAlignment="Center"/>
-                <Button Grid.Column="1" Width="48" Height="48" Background="Transparent" Click="ToggleSettings" ToolTip="Настройки" AutomationProperties.Name="Настройки"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="30"/></Button>
-                <Button x:Name="OutputButton" Grid.Column="2" Width="48" Height="48"
-                        Background="Transparent" Click="ShowOutputs" ToolTip="Устройство вывода"
-                        AutomationProperties.Name="Устройство вывода">
-                    <Viewbox Width="30" Height="34">
-                        <Canvas Width="30" Height="34">
-                            <Path Data="M 12,5 C 4,0 2,6 2,11 L 2,23 C 2,33 14,33 14,23 L 14,11 C 14,1 26,1 26,11 L 26,28"
-                                  Stroke="{DynamicResource Ink}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                            <Path Data="M 2,12 L 8,12 M 20,26 L 26,26" Stroke="{DynamicResource Ink}" StrokeThickness="4"/>
-                        </Canvas>
-                    </Viewbox>
-                </Button>
-            </Grid>
-            <Border x:Name="SettingsPanel" Visibility="Collapsed">
+        <DataTemplate x:Key="SettingsContent">
                 <StackPanel>
                     <DockPanel Margin="0,0,0,24">
                         <Button Content="←" Click="ToggleSettings" Width="52" Height="52" FontSize="30" ToolTip="Вернуться к микшеру" Margin="0,0,18,0"/>
                         <TextBlock Text="Настройки" FontSize="34" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </DockPanel>
-                    <ScrollViewer MaxHeight="650" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ScrollViewer x:Name="SettingsScroll" MaxHeight="650" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="0,0,8,0">
                         <TextBlock Text="Тема" FontSize="23" FontWeight="SemiBold" Margin="0,0,0,14"/>
                         <UniformGrid Columns="4" x:Name="ThemeChoices">
@@ -304,6 +277,12 @@
 </Button>
                         </UniformGrid>
                         <Button Content="✦  Своя тема" Click="OpenThemeEditor" FontSize="21" Height="54" Margin="0,14,12,0"/>
+                        <TextBlock Text="Горячая клавиша микшера" FontSize="23" FontWeight="SemiBold" Margin="0,26,0,14"/>
+                        <DockPanel Margin="0,0,12,0">
+                            <Button Content="Сбросить" Click="ClearShortcut" DockPanel.Dock="Right" Width="145" Margin="12,0,0,0" FontSize="19"/>
+                            <Button x:Name="ShortcutButton" Click="StartShortcutCapture" LostKeyboardFocus="ShortcutLostFocus" Height="52" FontSize="20"/>
+                        </DockPanel>
+                        <TextBlock x:Name="ShortcutHint" FontSize="17" TextWrapping="Wrap" Foreground="{DynamicResource Secondary}" Margin="0,6,0,0"/>
                         <TextBlock Text="Размер интерфейса" FontSize="23" FontWeight="SemiBold" Margin="0,26,0,14"/>
                         <UniformGrid Columns="3">
                             <Button x:Name="Size460" Content="Компактный" Tag="460" Click="SelectSize" Height="54" Margin="0,0,12,0" FontSize="20"/>
@@ -343,8 +322,8 @@
                                 <TextBlock Text="Свои папки" FontSize="23" FontWeight="SemiBold"/>
                                 <TextBlock Text="Назначайте приложения правой кнопкой в микшере" FontSize="18" Foreground="{DynamicResource Secondary}" Margin="0,7,0,16"/>
                                 <DockPanel>
-                                    <Button Content="+  Создать" Click="CreateGroup" DockPanel.Dock="Right" Width="155" FontSize="20" Background="{DynamicResource Panel}"/>
-                                    <Border CornerRadius="12" Background="{DynamicResource Panel}" Padding="14,10" Margin="0,0,12,0">
+                                    <Button Content="+  Создать" Click="CreateGroup" DockPanel.Dock="Right" Width="155" FontSize="20" Background="{DynamicResource ElementPanel}"/>
+                                    <Border CornerRadius="12" Background="{DynamicResource ElementPanel}" Padding="14,10" Margin="0,0,12,0">
                                         <TextBox x:Name="NewGroupName" MaxLength="32" FontSize="21" BorderThickness="0"
                                                  Background="Transparent" Foreground="{DynamicResource Ink}" CaretBrush="{DynamicResource Ink}" ToolTip="Название папки"/>
                                     </Border>
@@ -358,7 +337,37 @@
                     </StackPanel>
                     </ScrollViewer>
                 </StackPanel>
-            </Border>
+        </DataTemplate>
+    </Window.Resources>
+    <AdornerDecorator>
+
+    <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Stroke}" BorderThickness="7" CornerRadius="40">
+        <Border.LayoutTransform><ScaleTransform x:Name="InterfaceScale" ScaleX="0.606" ScaleY="0.606"/></Border.LayoutTransform>
+        <Grid>
+        <Border x:Name="ThemeBackdrop" IsHitTestVisible="False" CornerRadius="33"/>
+        <Border x:Name="ThemeShade" IsHitTestVisible="False" Background="Black" Visibility="Collapsed" CornerRadius="33"/>
+        <StackPanel Margin="40,32,46,16">
+            <Grid x:Name="MixerHeader" Margin="0,0,0,37">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="62"/><ColumnDefinition Width="50"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Veyro" FontSize="38" FontWeight="SemiBold"
+                           Background="Transparent" MouseLeftButtonDown="DragHeader" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Width="48" Height="48" Background="Transparent" Click="ToggleSettings" ToolTip="Настройки" AutomationProperties.Name="Настройки"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="30"/></Button>
+                <Button x:Name="OutputButton" Grid.Column="2" Width="48" Height="48"
+                        Background="Transparent" Click="ShowOutputs" ToolTip="Устройство вывода"
+                        AutomationProperties.Name="Устройство вывода">
+                    <Viewbox Width="30" Height="34">
+                        <Canvas Width="30" Height="34">
+                            <Path Data="M 12,5 C 4,0 2,6 2,11 L 2,23 C 2,33 14,33 14,23 L 14,11 C 14,1 26,1 26,11 L 26,28"
+                                  Stroke="{DynamicResource Ink}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            <Path Data="M 2,12 L 8,12 M 20,26 L 26,26" Stroke="{DynamicResource Ink}" StrokeThickness="4"/>
+                        </Canvas>
+                    </Viewbox>
+                </Button>
+            </Grid>
+            <Border x:Name="SettingsPanel" Visibility="Collapsed"/>
             <Border x:Name="FolderPanel" Visibility="Collapsed">
                 <StackPanel>
                     <DockPanel Margin="0,0,0,22">
@@ -380,7 +389,7 @@
                             <TextBlock Text="Новая папка" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,12"/>
                             <DockPanel>
                                 <Button Content="Создать и выбрать" Click="CreateAndAssignFolder" DockPanel.Dock="Right" Width="225" FontSize="19"/>
-                                <Border Background="{DynamicResource Panel}" CornerRadius="12" Padding="12,10" Margin="0,0,12,0">
+                                <Border Background="{DynamicResource ElementPanel}" CornerRadius="12" Padding="12,10" Margin="0,0,12,0">
                                     <TextBox x:Name="FolderNameInput" MaxLength="32" FontSize="21" BorderThickness="0" Background="Transparent"
                                              Foreground="{DynamicResource Ink}" CaretBrush="{DynamicResource Ink}" ToolTip="Название папки"/>
                                 </Border>
@@ -405,6 +414,7 @@
                 </TextBlock.Style>
             </TextBlock>
         </StackPanel>
+        </Grid>
     </Border>
     </AdornerDecorator>
 </Window>

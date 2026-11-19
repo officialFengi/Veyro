@@ -14,49 +14,57 @@ internal static class Installer
 {
     internal const string ProductKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Veyro";
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    internal static string DefaultDirectory()
+    internal static string DefaultDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Veyro");
+
+    internal static string? InstalledDirectory()
     {
         using var key = Registry.CurrentUser.OpenSubKey(ProductKey);
-        return key?.GetValue("InstallLocation") as string ??
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Veyro");
+        if (key?.GetValue("InstallLocation") is string directory && Path.IsPathFullyQualified(directory)
+            && File.Exists(Path.Combine(directory, "Veyro.exe")))
+            return Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
+        return File.Exists(Path.Combine(DefaultDirectory, "Veyro.exe")) ? DefaultDirectory : null;
     }
 
-    internal static string Install(string directory, bool autostart, bool desktop, IProgress<string> progress)
+    internal static string Install(string directory, bool updating, bool autostart, bool desktop, IProgress<string> progress)
     {
-        directory = Path.GetFullPath(directory.Trim());
+        directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory.Trim()));
         if (directory == Path.GetPathRoot(directory)) throw new IOException("Выберите отдельную папку для приложения.");
         using var mutex = new System.Threading.Mutex(false, @"Local\Veyro.Setup");
         if (!mutex.WaitOne(0)) throw new IOException("Другая установка Veyro уже выполняется.");
-        try { return InstallCore(directory, autostart, desktop, progress); }
+        try { return InstallCore(directory, updating, autostart, desktop, progress); }
         finally { mutex.ReleaseMutex(); }
     }
 
-    private static string InstallCore(string directory, bool autostart, bool desktop, IProgress<string> progress)
+    private static string InstallCore(string directory, bool updating, bool autostart, bool desktop, IProgress<string> progress)
     {
-        var previousDirectory = DefaultDirectory();
+        var previousDirectory = InstalledDirectory();
+        if (updating != (previousDirectory is not null) ||
+            (updating && !string.Equals(previousDirectory, directory, StringComparison.OrdinalIgnoreCase)))
+            throw new IOException("Состояние установки изменилось. Откройте установщик снова.");
         using var oldProduct = Registry.CurrentUser.OpenSubKey(ProductKey);
-        if (oldProduct is not null && !string.Equals(Path.GetFullPath(previousDirectory), directory, StringComparison.OrdinalIgnoreCase))
-            throw new IOException("Veyro уже установлен. Для обновления используйте папку " + previousDirectory);
         var appPath = Path.Combine(directory, "Veyro.exe");
         var uninstallPath = Path.Combine(directory, "Uninstall-Veyro.exe");
         var startLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Veyro.lnk");
         var desktopLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Veyro.lnk");
         Directory.CreateDirectory(directory);
         var staging = Path.Combine(directory, ".veyro-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(staging);
         var backups = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var path in new[] { appPath, uninstallPath, startLink, desktopLink })
-        {
-            var backup = File.Exists(path) ? Path.Combine(staging, Guid.NewGuid().ToString("N")) : null;
-            if (backup is not null) File.Copy(path, backup);
-            backups[path] = backup;
-        }
+        var changedFiles = new Stack<string>();
+        var registering = false;
         var registryValues = oldProduct?.GetValueNames().ToDictionary(name => name,
             name => (oldProduct.GetValue(name), oldProduct.GetValueKind(name)));
-        using var run = Registry.CurrentUser.CreateSubKey(RunKey);
-        var oldRun = run.GetValue("Veyro");
+        using var run = updating ? null : Registry.CurrentUser.CreateSubKey(RunKey);
+        var oldRun = run?.GetValue("Veyro");
+        Directory.CreateDirectory(staging);
         try
         {
+            foreach (var path in updating ? new[] { appPath, uninstallPath } : new[] { appPath, uninstallPath, startLink, desktopLink })
+            {
+                var backup = File.Exists(path) ? Path.Combine(staging, Guid.NewGuid().ToString("N")) : null;
+                if (backup is not null) File.Copy(path, backup);
+                backups[path] = backup;
+            }
             progress.Report("Распаковываем приложение…");
             using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Veyro.Payload")!)
             using (var zip = new ZipArchive(stream))
@@ -80,16 +88,24 @@ internal static class Installer
                 }
             }
             File.Move(Path.Combine(staging, "Veyro.exe"), appPath, true);
+            changedFiles.Push(appPath);
             File.Move(Path.Combine(staging, "Uninstall-Veyro.exe"), uninstallPath, true);
-            progress.Report("Добавляем ярлыки и параметры запуска…");
-            CreateShortcut(startLink, appPath);
-            if (desktop) CreateShortcut(desktopLink, appPath);
-            else if (File.Exists(desktopLink)) File.Delete(desktopLink);
-            if (autostart) run.SetValue("Veyro", '"' + appPath + '"');
-            else run.DeleteValue("Veyro", false);
+            changedFiles.Push(uninstallPath);
+            if (!updating)
+            {
+                progress.Report("Добавляем ярлыки и параметры запуска…");
+                changedFiles.Push(startLink);
+                CreateShortcut(startLink, appPath);
+                changedFiles.Push(desktopLink);
+                if (desktop) CreateShortcut(desktopLink, appPath);
+                else if (File.Exists(desktopLink)) File.Delete(desktopLink);
+                if (autostart) run!.SetValue("Veyro", '"' + appPath + '"');
+                else run!.DeleteValue("Veyro", false);
+            }
             using var product = Registry.CurrentUser.CreateSubKey(ProductKey);
+            registering = true;
             product.SetValue("DisplayName", "Veyro");
-            product.SetValue("DisplayVersion", "1.0.0");
+            product.SetValue("DisplayVersion", typeof(Installer).Assembly.GetName().Version!.ToString(3));
             product.SetValue("Publisher", "Fengible");
             product.SetValue("InstallLocation", directory);
             product.SetValue("DisplayIcon", appPath);
@@ -103,13 +119,17 @@ internal static class Installer
         }
         catch
         {
-            foreach (var pair in backups)
+            foreach (var path in changedFiles)
             {
-                if (pair.Value is not null) File.Copy(pair.Value, pair.Key, true);
-                else if (File.Exists(pair.Key)) File.Delete(pair.Key);
+                if (backups[path] is string backup) File.Copy(backup, path, true);
+                else File.Delete(path);
             }
-            if (oldRun is not null) run.SetValue("Veyro", oldRun);
-            else run.DeleteValue("Veyro", false);
+            if (run is not null)
+            {
+                if (oldRun is not null) run.SetValue("Veyro", oldRun);
+                else run!.DeleteValue("Veyro", false);
+            }
+            if (!registering) throw;
             if (registryValues is null) Registry.CurrentUser.DeleteSubKeyTree(ProductKey, false);
             else
             {

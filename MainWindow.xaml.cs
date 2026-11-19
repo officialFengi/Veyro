@@ -23,21 +23,34 @@ public partial class MainWindow : Window
 {
     private readonly MMDeviceEnumerator audio = new();
     private readonly ObservableCollection<MixerChannel> rows = new();
-    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(750) };
+    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(3) };
 
 
     private MMDevice? endpoint;
     private Dictionary<string, AppSessions>? cachedSessions;
-    private long nextSessionScan;
+    private readonly AudioChanges changes;
+    private sealed record WatchedSession(AudioSessionControl Control, string Key, string Name, string? Executable);
+    private readonly Dictionary<string, WatchedSession> watchedSessions = new();
+    private readonly HashSet<string> liveSessionIds = new();
+    private bool observingDevices;
+    private MixerChannel? masterRow;
     private bool exiting;
     private System.Windows.Controls.Primitives.Popup? outputMenu;
     private long hiddenAt;
 
 
-    public MainWindow()
+    internal MainWindow(IMixerShortcut shortcut, Preferences settings)
     {
+        this.shortcut = shortcut;
+        preferences = settings;
+        changes = new AudioChanges(Dispatcher, topology =>
+        {
+            if (!timer.IsEnabled || !IsVisible) return;
+            if (topology) RefreshMixer();
+            else RefreshLevels();
+        });
         InitializeComponent();
-        LoadPreferences();
+        ApplyPreferences();
         MixerRows.ItemsSource = displayedRows;
         PreviewMouseDown += (_, mouse) =>
         {
@@ -49,6 +62,7 @@ public partial class MainWindow : Window
         Deactivated += (_, _) => { if (!choosingColor) DismissMixer(); };
         PreviewKeyDown += (_, e) =>
         {
+            if (CaptureShortcut(e)) return;
             if (e.Key == Key.Escape)
                 DismissMixer();
         };
@@ -57,17 +71,27 @@ public partial class MainWindow : Window
             if (IsVisible)
                 PositionMixer();
         };
-        timer.Tick += (_, _) => RefreshMixer();
+        timer.Tick += (_, _) => RefreshMixer(rebuildGroups: false);
         IsVisibleChanged += (_, _) =>
         {
             if (IsVisible)
             {
+                observingDevices = audio.RegisterEndpointNotificationCallback(changes) >= 0;
+                ApplyThemeBackground(themeStudio is not null);
                 RefreshMixer();
                 if (SettingsPanel.Visibility != Visibility.Visible && FolderPanel.Visibility != Visibility.Visible) timer.Start();
             }
             else
             {
                 timer.Stop();
+                CancelShortcutCapture();
+                StopObserving();
+                if (themeStudio is null)
+                {
+                    ThemeBackdrop.Background = null;
+                    savedBackground = null;
+                    backgroundLoaded = false;
+                }
             }
         };
         Closing += (_, e) =>
@@ -80,156 +104,210 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             timer.Stop();
-
-
-
-            endpoint?.Dispose();
+            StopObserving();
             audio.Dispose();
-            Application.Current.Shutdown();
         };
     }
 
-    private void RefreshMixer()
+    private void RefreshMixer(bool rebuildGroups = true)
     {
         try
         {
             if (!audio.HasDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia))
             {
-                rows.Clear();
-                displayedRows.Clear();
-                endpoint?.Dispose();
-                endpoint = null;
-                cachedSessions = null;
+                ReleaseMixerRows();
                 Status.Text = "Подключите устройство вывода звука.";
                 return;
             }
 
             using var current = audio.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            if (endpoint?.ID != current.ID)
+            var id = current.ID;
+            if (endpoint?.ID != id)
             {
-                var replacement = audio.GetDevice(current.ID);
-                rows.Clear();
-                displayedRows.Clear();
-                endpoint?.Dispose();
-                endpoint = replacement;
-                cachedSessions = null;
+                ReleaseMixerRows();
+                endpoint = audio.GetDevice(id);
+                var master = endpoint.AudioEndpointVolume;
+                master.OnVolumeNotification += changes.OnEndpointVolume;
+                endpoint.AudioSessionManager.OnSessionCreated += changes.OnSessionCreated;
+                masterRow = new MixerChannel("master", endpoint.FriendlyName, null);
+                masterRow.Bind(value => master.MasterVolumeLevelScalar = value, mute => master.Mute = mute);
+                rows.Add(masterRow);
             }
-            var device = endpoint!;
-            var master = device.AudioEndpointVolume;
-            UpdateChannel("master", device.FriendlyName, null,
-                () => master.MasterVolumeLevelScalar, value => master.MasterVolumeLevelScalar = value,
-                () => master.Mute, muted => master.Mute = muted);
-
-            if (cachedSessions is null || Environment.TickCount64 >= nextSessionScan)
-            {
-                cachedSessions = ReadSessions(device);
-                nextSessionScan = Environment.TickCount64 + 3000;
-            }
-            var apps = cachedSessions;
-            foreach (var (key, app) in apps.OrderBy(item => item.Value.Name, StringComparer.CurrentCultureIgnoreCase))
-            {
-                var volumes = app.Volumes;
-                UpdateChannel(key, app.Name, app.Executable,
-                    () => volumes.Max(volume => volume.Volume),
-                    value => ApplyToSessions(volumes, volume => volume.Volume = value),
-                    () => volumes.All(volume => volume.Mute),
-                    muted => ApplyToSessions(volumes, volume => volume.Mute = muted));
-            }
-            for (var i = rows.Count - 1; i > 0; i--)
-            {
-                if (!apps.ContainsKey(rows[i].Key))
-                    rows.RemoveAt(i);
-            }
-            RefreshGroups(apps);
+            bool outputsChanged = RefreshExtraOutputs(id);
+            bool sessionsChanged = ScanSessions(endpoint!);
+            var apps = cachedSessions!;
+            if (sessionsChanged) BindAppRows(apps);
+            if (sessionsChanged || outputsChanged || rebuildGroups) RefreshGroups(apps);
+            RefreshLevels();
             Status.Text = apps.Count == 0 ? "Запустите звук в приложении, чтобы оно появилось в микшере." : "";
         }
-        catch (COMException)
-        {
-            cachedSessions = null;
-            Status.Text = "Устройство вывода временно недоступно.";
-        }
+        catch (COMException) { Status.Text = "Устройство вывода временно недоступно."; }
     }
 
-    private static readonly Dictionary<string, (string Name, string? Executable)> sessionMetadata = new();
-
-    private static Dictionary<string, AppSessions> ReadSessions(MMDevice device)
+    private void BindAppRows(Dictionary<string, AppSessions> apps)
     {
-        var result = new Dictionary<string, AppSessions>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, app) in apps)
+        {
+            var row = rows.FirstOrDefault(item => StringComparer.OrdinalIgnoreCase.Equals(item.Key, key));
+            if (row is null)
+            {
+                row = new MixerChannel(key, app.Name, LoadIcon(app.Executable));
+                rows.Add(row);
+            }
+            app.Channel = row;
+            var volumes = app.Volumes;
+            row.Bind(value => ApplyToSessions(volumes, volume => volume.Volume = value),
+                mute => ApplyToSessions(volumes, volume => volume.Mute = mute));
+        }
+        for (var i = rows.Count - 1; i > 0; i--)
+            if (!apps.ContainsKey(rows[i].Key)) rows.RemoveAt(i);
+    }
+
+    private void RefreshLevels()
+    {
+        if (endpoint is null || cachedSessions is null) return;
+        try
+        {
+            var master = endpoint.AudioEndpointVolume;
+            masterRow?.SetLevels(master.MasterVolumeLevelScalar, master.Mute);
+            foreach (var output in extraOutputs.Values)
+            {
+                var volume = output.Device.AudioEndpointVolume;
+                output.Channel.SetLevels(volume.MasterVolumeLevelScalar, volume.Mute);
+            }
+            foreach (var app in cachedSessions.Values)
+            {
+                float level = 0;
+                bool muted = true;
+                foreach (var volume in app.Volumes)
+                {
+                    level = Math.Max(level, volume.Volume);
+                    muted &= volume.Mute;
+                }
+                app.Channel?.SetLevels(level, muted);
+            }
+            foreach (var (group, members) in groupMembers)
+            {
+                double highest = 0;
+                bool muted = true;
+                foreach (var member in members)
+                {
+                    highest = Math.Max(highest, member.Volume);
+                    muted &= member.IsMuted;
+                }
+                group.SetLevels((float)(highest / 100), muted);
+            }
+        }
+        catch (COMException) { /* The next topology refresh replaces disconnected sessions. */ }
+    }
+
+    private void StopObserving()
+    {
+        if (observingDevices)
+        {
+            audio.UnregisterEndpointNotificationCallback(changes);
+            observingDevices = false;
+        }
+        ReleaseMixerRows();
+    }
+
+    private void ReleaseMixerRows()
+    {
+        foreach (var session in watchedSessions.Values) DisposeSession(session.Control);
+        watchedSessions.Clear();
+        liveSessionIds.Clear();
+        cachedSessions = null;
+        groupRows.Clear();
+        groupMembers.Clear();
+        if (rows.Count > 0) rows.Clear();
+        if (displayedRows.Count > 0) displayedRows.Clear();
+        ClearExtraOutputs();
+        masterRow = null;
+        endpoint?.Dispose();
+        endpoint = null;
+    }
+
+    private static void DisposeSession(AudioSessionControl session)
+    {
+        try { session.Dispose(); }
+        catch (COMException) { /* Windows already removed this session. */ }
+    }
+
+    private bool ScanSessions(MMDevice device)
+    {
         var manager = device.AudioSessionManager;
         manager.RefreshSessions();
         var sessions = manager.Sessions;
-        var alive = new HashSet<string>();
-        for (var i = 0; i < sessions.Count; i++)
+        bool changed = cachedSessions is null;
+        liveSessionIds.Clear();
+        int count = sessions.Count;
+        for (int i = 0; i < count; i++)
+        {
+            AudioSessionControl? control = null;
+            try
+            {
+                control = sessions[i];
+                if (control.State == AudioSessionState.AudioSessionStateExpired) continue;
+                string id = control.GetSessionInstanceIdentifier;
+                liveSessionIds.Add(id);
+                if (watchedSessions.ContainsKey(id)) continue;
+                var info = DescribeSession(control, id);
+                try { control.RegisterEventClient(changes); }
+                catch (COMException) { /* The periodic refresh also reads volume and mute. */ }
+                watchedSessions.Add(id, info);
+                control = null; // The entry owns its notification registration until the session ends.
+                changed = true;
+            }
+            catch (COMException) { /* The session may have ended during enumeration. */ }
+            finally { if (control is not null) DisposeSession(control); }
+        }
+        if (!liveSessionIds.SetEquals(watchedSessions.Keys))
+        {
+            foreach (var id in watchedSessions.Keys.Where(id => !liveSessionIds.Contains(id)).ToArray())
+            {
+                DisposeSession(watchedSessions[id].Control);
+                watchedSessions.Remove(id);
+                changed = true;
+            }
+        }
+        if (!changed) return false;
+        var apps = new Dictionary<string, AppSessions>(StringComparer.OrdinalIgnoreCase);
+        foreach (var session in watchedSessions.Values)
+        {
+            if (!apps.TryGetValue(session.Key, out var app))
+                apps.Add(session.Key, app = new AppSessions(session.Name, session.Executable));
+            app.Volumes.Add(session.Control.SimpleAudioVolume);
+        }
+        cachedSessions = apps;
+        return true;
+    }
+
+    private static WatchedSession DescribeSession(AudioSessionControl session, string id)
+    {
+        uint pid = session.GetProcessID;
+        bool system = session.IsSystemSoundsSession;
+        string name = system ? "Системные звуки" : session.DisplayName;
+        string? executable = null;
+        if (!system && pid != 0)
         {
             try
             {
-                using var session = sessions[i];
-                if (session.State == AudioSessionState.AudioSessionStateExpired)
-                    continue;
-
-                var pid = session.GetProcessID;
-                var system = session.IsSystemSoundsSession;
-                var name = system ? "Системные звуки" : session.DisplayName;
-                string? executable = null;
-                var identity = session.GetSessionInstanceIdentifier;
-                alive.Add(identity);
-                var cached = sessionMetadata.TryGetValue(identity, out var metadata);
-                if (cached)
+                using var process = Process.GetProcessById((int)pid);
+                if (string.IsNullOrWhiteSpace(name) || name.StartsWith('@')) name = process.ProcessName;
+                executable = process.MainModule?.FileName;
+                if (!string.IsNullOrWhiteSpace(executable))
                 {
-                    name = metadata.Name;
-                    executable = metadata.Executable;
+                    string? description = FileVersionInfo.GetVersionInfo(executable).FileDescription;
+                    if (!string.IsNullOrWhiteSpace(description)) name = description;
                 }
-                if (!cached && !system && pid != 0)
-                {
-                    try
-                    {
-                        using var process = Process.GetProcessById((int)pid);
-                        if (string.IsNullOrWhiteSpace(name) || name.StartsWith('@'))
-                            name = process.ProcessName;
-                        executable = process.MainModule?.FileName;
-                        if (!string.IsNullOrWhiteSpace(executable))
-                        {
-                            var description = FileVersionInfo.GetVersionInfo(executable).FileDescription;
-                            if (!string.IsNullOrWhiteSpace(description))
-                                name = description;
-                        }
-                    }
-                    catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or Win32Exception or IOException)
-                    {
-                        // Protected or recently exited processes may not expose their executable.
-                    }
-                }
-
-                if (string.IsNullOrWhiteSpace(name) || name.StartsWith('@'))
-                    name = pid == 0 ? "Аудиосеанс" : $"Приложение ({pid})";
-                sessionMetadata[identity] = (name, executable);
-                var key = system ? "system" : executable ?? (pid == 0 ? session.GetSessionInstanceIdentifier : $"pid:{pid}");
-                if (!result.TryGetValue(key, out var app))
-                    result.Add(key, app = new AppSessions(name, executable));
-                app.Volumes.Add(session.SimpleAudioVolume);
             }
-            catch (COMException)
-            {
-                // A session can end while Windows is enumerating it.
-            }
+            catch (Exception error) when (error is ArgumentException or InvalidOperationException or Win32Exception or IOException)
+            { /* Protected processes may only expose the session name. */ }
         }
-        foreach (var stale in sessionMetadata.Keys.Where(key => !alive.Contains(key)).ToArray())
-            sessionMetadata.Remove(stale);
-        return result;
-    }
-
-    private void UpdateChannel(string key, string name, string? executable, Func<float> readVolume,
-        Action<float> writeVolume, Func<bool> readMute, Action<bool> writeMute)
-    {
-        var row = rows.FirstOrDefault(item => StringComparer.OrdinalIgnoreCase.Equals(item.Key, key));
-        var volume = readVolume();
-        var muted = readMute();
-        if (row is null)
-        {
-            row = new MixerChannel(key, name, LoadIcon(executable));
-            rows.Add(row);
-        }
-        row.Refresh(volume, muted, writeVolume, writeMute);
+        if (string.IsNullOrWhiteSpace(name) || name.StartsWith('@'))
+            name = pid == 0 ? "Аудиосеанс" : $"Приложение ({pid})";
+        string key = system ? "system" : executable ?? (pid == 0 ? id : $"pid:{pid}");
+        return new WatchedSession(session, key, name, executable);
     }
 
     private static void ApplyToSessions(IEnumerable<SimpleAudioVolume> volumes, Action<SimpleAudioVolume> apply)
@@ -282,12 +360,14 @@ public partial class MainWindow : Window
             StaysOpen = true,
             PopupAnimation = System.Windows.Controls.Primitives.PopupAnimation.None
         };
+        var available = new Dictionary<string, string>();
         try
         {
             foreach (var device in audio.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
             {
                 using var output = device;
                 var id = output.ID;
+                available[id] = output.FriendlyName;
                 var selected = id == endpoint?.ID;
                 var button = new Button
                 {
@@ -324,6 +404,7 @@ public partial class MainWindow : Window
         }
         if (options.Children.Count == 1)
             options.Children.Add(new TextBlock { Text = "Нет доступных устройств", Margin = new Thickness(10), Foreground = (Brush)Resources["Ink"] });
+        AddMultiSoundOptions(options, available);
         popup.Child = new Border
         {
             Width = 370, Padding = new Thickness(10), CornerRadius = new CornerRadius(16),
@@ -365,7 +446,30 @@ public partial class MainWindow : Window
         hiddenAt = Environment.TickCount64;
     }
 
-    internal void ExitMixer() { exiting = true; Close(); }
+    internal Preferences CurrentSettings => preferences;
+    internal bool CanUnload => !IsVisible && !exiting && themeStudio is null && !saveFailed && !assigningShortcut;
+
+    internal MixerViewState CaptureView() => new(expandedGroups.ToArray(), SettingsPanel.Visibility == Visibility.Visible,
+        settingsView is null ? "" : NewGroupName.Text, folderTarget?.Key, folderTarget?.Name, FolderNameInput.Text,
+        settingsView is null ? 0 : SettingsScroll.VerticalOffset);
+
+    internal void RestoreView(MixerViewState? state)
+    {
+        if (state is null) return;
+        expandedGroups.UnionWith(state.ExpandedGroups);
+        if (state.NewGroupName.Length > 0) { EnsureSettingsView(); NewGroupName.Text = state.NewGroupName; }
+        if (state.SettingsOpen)
+        {
+            ToggleSettings(this, new RoutedEventArgs());
+            SettingsScroll.ScrollToVerticalOffset(state.SettingsOffset);
+        }
+        else if (state.FolderKey is not null && state.FolderName is not null)
+        {
+            OpenFolderPicker(new MixerChannel(state.FolderKey, state.FolderName, null));
+            FolderNameInput.Text = state.FolderDraft;
+        }
+    }
+    internal void CloseForRelease() { exiting = true; Close(); }
     internal void ToggleMixer()
     {
         if (IsVisible)
@@ -376,7 +480,6 @@ public partial class MainWindow : Window
 
     internal void OpenMixer()
     {
-        nextSessionScan = 0;
         Show();
         UpdateLayout();
         PositionMixer();
@@ -399,6 +502,7 @@ public partial class MainWindow : Window
     }
     private sealed record AppSessions(string Name, string? Executable)
     {
+        public MixerChannel? Channel { get; set; }
         public List<SimpleAudioVolume> Volumes { get; } = new();
     }
 }

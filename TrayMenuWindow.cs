@@ -14,9 +14,9 @@ internal sealed class TrayMenuWindow : Window
 {
     private bool closing;
     private bool actionQueued;
-    internal TrayMenuWindow(Action open, Action exit)
+    internal TrayMenuWindow(Preferences preferences, Action open, Action exit)
     {
-        var palette=ReadPalette();
+        var palette=ThemePalette.Resolve(preferences.Theme, preferences.CustomColors);
         SolidColorBrush ColorAt(int index)=>(SolidColorBrush)new BrushConverter().ConvertFromString(palette[index])!;
         Width=228;
         SizeToContent=SizeToContent.Height;
@@ -91,24 +91,6 @@ internal sealed class TrayMenuWindow : Window
         };
     }
 
-    private static string[] ReadPalette()
-    {
-        try
-        {
-            var path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Veyro","settings.json");
-            if(!File.Exists(path))return ThemePalette.Resolve("Graphite");
-            using var document=JsonDocument.Parse(File.ReadAllText(path));
-            var root=document.RootElement;
-            var name=root.TryGetProperty("Theme",out var theme)?theme.GetString():"Graphite";
-            var custom=root.TryGetProperty("CustomColors",out var colors)&&colors.ValueKind==JsonValueKind.Object
-                ?colors.Deserialize<Dictionary<string,string>>():null;
-            return ThemePalette.Resolve(name??"Graphite",custom);
-        }
-        catch(Exception error) when(error is IOException or UnauthorizedAccessException or JsonException)
-        {
-            return ThemePalette.Resolve("Graphite");
-        }
-    }
 }
 
 

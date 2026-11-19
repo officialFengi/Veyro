@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <StartupObject>Veyro.TrayHost</StartupObject>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
@@ -9,8 +10,10 @@
     <ApplicationIcon>assets\app.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
     <Resource Include="assets\app.ico" />
+    <EmbeddedResource Include="assets\app.ico" LogicalName="Veyro.TrayIcon" />
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="installer\**\*.cs" />

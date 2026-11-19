@@ -14,6 +14,8 @@ internal sealed class MixerChannel(string key, string name, ImageSource? icon) :
 
     public string Key { get; } = key;
     public string Name { get; } = name;
+    public bool IsMuted => muted;
+    public bool IsOutput => Key == "master" || Key.StartsWith("device:", StringComparison.Ordinal);
     public ImageSource? Icon => muted ? null : icon;
     public string Glyph => muted ? "\uE74F" : icon is null ? "\uE767" : "";
     public string MuteHint => $"{(muted ? "Включить звук" : "Выключить звук")} — {Name}";
@@ -38,10 +40,14 @@ internal sealed class MixerChannel(string key, string name, ImageSource? icon) :
         }
     }
 
-    public void Refresh(float level, bool isMuted, Action<float> setVolume, Action<bool> setMute)
+    public void Bind(Action<float> setVolume, Action<bool> setMute)
     {
         writeVolume = setVolume;
         writeMute = setMute;
+    }
+
+    public void SetLevels(float level, bool isMuted)
+    {
         SetVolume(Math.Round(level * 100));
         SetMute(isMuted);
     }

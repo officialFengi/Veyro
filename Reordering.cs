@@ -39,7 +39,7 @@ public partial class MainWindow
         }
         if (e.LeftButton != MouseButtonState.Pressed ||
             sender is not FrameworkElement { DataContext: MixerChannel row } label ||
-            row.Key == "master" || row.Key.StartsWith("group:"))
+            row.IsOutput || row.Key.StartsWith("group:"))
             return;
         var delta = e.GetPosition(SessionScroll) - reorderStart;
         if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance &&
@@ -57,7 +57,7 @@ public partial class MainWindow
         dragRows.Clear();
         foreach (var grid in VisualDescendants<Grid>(MixerRows).Where(grid => grid.Name == "ChannelRow"))
         {
-            if (grid.DataContext is not MixerChannel channel || channel.Key == "master") continue;
+            if (grid.DataContext is not MixerChannel channel || channel.IsOutput) continue;
             var top = grid.TranslatePoint(new Point(), SessionScroll).Y + SessionScroll.VerticalOffset;
             dragRows.Add((grid, top, channel));
         }

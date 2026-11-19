@@ -8,13 +8,25 @@ using Forms = System.Windows.Forms;
 namespace VeyroSetup;
 public partial class SetupWindow : Window
 {
+    private readonly bool updating;
     private bool installing;
     private bool installed;
     private string? installedPath;
     public SetupWindow()
     {
         InitializeComponent();
-        InstallPath.Text = Installer.DefaultDirectory();
+        var existing = Installer.InstalledDirectory();
+        updating = existing is not null;
+        InstallPath.Text = existing ?? Installer.DefaultDirectory;
+        if (updating)
+        {
+            Title = "Обновление Veyro";
+            ModeLabel.Text = "Обновление";
+            Heading.Text = "Обновить установленный Veyro";
+            Description.Text = $"Папка приложения — {existing}\nНастройки, автозапуск и ярлыки сохранятся.";
+            InstallButton.Content = "Обновить Veyro  →";
+            Options.Visibility = Visibility.Collapsed;
+        }
         Closing += (_, e) => e.Cancel = installing;
     }
     private void DragHeader(object sender, MouseButtonEventArgs e) { if (e.OriginalSource is System.Windows.Controls.TextBlock) DragMove(); }
@@ -36,9 +48,9 @@ public partial class SetupWindow : Window
         CloseButton.IsEnabled = false;
         InstallButton.IsEnabled = false;
         Options.Visibility = Visibility.Collapsed;
-        Heading.Text = "Устанавливаем Veyro";
+        Heading.Text = updating ? "Обновляем Veyro" : "Устанавливаем Veyro";
         Description.Text = "Это займёт немного времени.";
-        InstallButton.Content = "Установка…";
+        InstallButton.Content = updating ? "Обновление…" : "Установка…";
         Progress.IsIndeterminate = false;
         Progress.Value = 12;
         ProgressPanel.Visibility = Visibility.Visible;
@@ -53,25 +65,25 @@ public partial class SetupWindow : Window
         });
         try
         {
-            installedPath = await Task.Run(() => Installer.Install(directory, autostart, desktop, progress));
+            installedPath = await Task.Run(() => Installer.Install(directory, updating, autostart, desktop, progress));
             installed = true;
-            Heading.Text = "Veyro установлен";
+            Heading.Text = updating ? "Veyro обновлён" : "Veyro установлен";
             Description.Text = "Откройте микшер через значок в области уведомлений.";
             Options.Visibility = Visibility.Collapsed;
             Progress.IsIndeterminate = false;
             Progress.Value = 100;
-            ProgressText.Text = autostart ? "Автозапуск Windows включён" : "Автозапуск Windows выключен";
+            ProgressText.Text = updating ? "Настройки сохранены" : autostart ? "Автозапуск Windows включён" : "Автозапуск Windows выключен";
             InstallButton.Content = "Запустить Veyro  →";
             Footer.Text = "Удаление доступно в настройках приложений Windows";
         }
         catch (Exception error)
         {
-            ErrorText.Text = "Установка не завершена. " + error.Message;
+            ErrorText.Text = (updating ? "Обновление не завершено. " : "Установка не завершена. ") + error.Message;
             ProgressPanel.Visibility = Visibility.Collapsed;
-            Options.Visibility = Visibility.Visible;
-            Heading.Text = "Повторить установку";
+            Options.Visibility = updating ? Visibility.Collapsed : Visibility.Visible;
+            Heading.Text = updating ? "Повторить обновление" : "Повторить установку";
             Description.Text = "Проверьте параметры и попробуйте ещё раз.";
-            InstallButton.Content = "Установить Veyro →";
+            InstallButton.Content = updating ? "Обновить Veyro →" : "Установить Veyro →";
         }
         finally
         {

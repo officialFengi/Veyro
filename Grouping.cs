@@ -12,6 +12,7 @@ public partial class MainWindow
 {
     private readonly ObservableCollection<MixerChannel> displayedRows = new();
     private readonly Dictionary<string, MixerChannel> groupRows = new();
+    private readonly Dictionary<MixerChannel, MixerChannel[]> groupMembers = new();
     private readonly HashSet<string> expandedGroups = new();
     private static readonly string[] Categories = { "Мессенджеры", "Браузеры", "Музыка и видео", "Игры", "Другое" };
 
@@ -40,10 +41,12 @@ public partial class MainWindow
 
     private void RefreshGroups(Dictionary<string, AppSessions> apps)
     {
+        groupMembers.Clear();
         var desired = new List<MixerChannel>();
         var master = rows.FirstOrDefault(row => row.Key == "master");
         if (master is not null)
             desired.Add(master);
+        desired.AddRange(extraOutputs.Values.Select(output => output.Channel));
         var ordered = rows.Where(row => row.Key != "master")
             .OrderBy(row =>
             {
@@ -66,7 +69,8 @@ public partial class MainWindow
             var volumes = group.Where(row => apps.ContainsKey(row.Key)).SelectMany(row => apps[row.Key].Volumes).ToList();
             if (volumes.Count == 0)
                 continue;
-            channel.Refresh(volumes.Max(volume => volume.Volume), volumes.All(volume => volume.Mute),
+            groupMembers[channel] = group.ToArray();
+            channel.Bind(
                 value => ApplyToSessions(volumes, volume => volume.Volume = value),
                 muted => ApplyToSessions(volumes, volume => volume.Mute = muted));
             desired.Add(channel);
@@ -123,7 +127,7 @@ public partial class MainWindow
 
     private void ShowSorting(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: MixerChannel row } || row.Key == "master" || row.Key.StartsWith("group:"))
+        if (sender is not FrameworkElement { DataContext: MixerChannel row } || row.IsOutput || row.Key.StartsWith("group:"))
             return;
         OpenFolderPicker(row);
         e.Handled = true;
@@ -139,6 +143,7 @@ public partial class MainWindow
                 return index < 0 ? int.MaxValue : index;
             }).ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).Select(item => item.Key).ToList();
         var oldIndex = siblings.IndexOf(row.Key);
+        if (oldIndex < 0) return;
         var newIndex = Math.Clamp(oldIndex + direction, 0, siblings.Count - 1);
         (siblings[oldIndex], siblings[newIndex]) = (siblings[newIndex], siblings[oldIndex]);
         preferences.AppOrder!.RemoveAll(siblings.Contains);

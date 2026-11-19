@@ -4,6 +4,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using Microsoft.Win32;
 
 namespace Veyro;
 
@@ -11,7 +13,11 @@ internal sealed class ThemeEditorWindow : Window
 {
     private readonly Dictionary<string, string> colors;
     private readonly Action<Dictionary<string, string>> preview;
-    private readonly Action<Dictionary<string, string>> save;
+    private readonly Action<Dictionary<string, string>, BitmapSource?> save;
+    internal BitmapSource? BackgroundImage { get; private set; }
+    internal int BackgroundDimming { get; private set; }
+    internal int ElementTransparency { get; private set; }
+    internal Dictionary<string, string> Colors => new(colors);
     private readonly Slider[] channels = new Slider[3];
     private readonly Dictionary<string, Button> swatches = new();
     private readonly TextBox hex = new();
@@ -21,12 +27,16 @@ internal sealed class ThemeEditorWindow : Window
     private string selected = "Accent";
     private bool updating;
 
-    public bool Saved { get; private set; }
 
-    internal ThemeEditorWindow(string[] palette, Action<Dictionary<string,string>> preview, Action<Dictionary<string,string>> save)
+    internal ThemeEditorWindow(string[] palette, BitmapSource? backgroundImage, int backgroundDimming, int elementTransparency,
+        Action<Dictionary<string,string>> preview, Action<Dictionary<string,string>, BitmapSource?> save)
     {
         this.preview = preview;
         this.save = save;
+        BackgroundImage = backgroundImage;
+        BackgroundDimming = backgroundDimming;
+        ElementTransparency = elementTransparency;
+        MaxHeight = SystemParameters.WorkArea.Height;
         colors = new Dictionary<string,string>();
         for (var i = 0; i < ThemePalette.Keys.Length; i++) colors[ThemePalette.Keys[i]] = palette[i];
         Title = "Veyro · Студия темы";
@@ -42,7 +52,7 @@ internal sealed class ThemeEditorWindow : Window
         ShowInTaskbar = false;
         var root = new StackPanel();
         Content = new Border { Background = Brush("#171B24"), BorderBrush = Brush("#394254"), BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(22), Padding = new Thickness(24), Child = root };
+            CornerRadius = new CornerRadius(22), Padding = new Thickness(24), Child = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root } };
         var header = new DockPanel { Margin = new Thickness(0,0,0,8) };
         var close = MakeButton("×", () => Close());
         close.Width = 34;
@@ -116,12 +126,61 @@ internal sealed class ThemeEditorWindow : Window
             presets.Children.Add(button);
         }
         root.Children.Add(presets);
+        var images = new DockPanel { Margin = new Thickness(0, 14, 0, 0) };
+        var removeImage = MakeButton("Убрать фон", () =>
+        {
+            BackgroundImage = null;
+            preview(Colors);
+        });
+        DockPanel.SetDock(removeImage, Dock.Right);
+        images.Children.Add(removeImage);
+        var chooseImage = MakeButton("Выбрать изображение…", () =>
+        {
+            var picker = new OpenFileDialog { Title = "Фон своей темы", Filter = "Изображения|*.png;*.jpg;*.jpeg;*.bmp" };
+            if (picker.ShowDialog(this) != true) return;
+            try
+            {
+                BackgroundImage = MainWindow.ReadBackground(picker.FileName);
+                preview(Colors);
+                feedback.Text = "Фон появится в сохранённой теме";
+            }
+            catch (Exception error) when (MainWindow.IsImageError(error))
+            {
+                feedback.Text = "Не удалось открыть изображение. Выберите другой файл.";
+            }
+        });
+        chooseImage.Margin = new Thickness(0, 0, 8, 0);
+        images.Children.Add(chooseImage);
+        root.Children.Add(images);
+        AddPercentSlider("Затемнение фона", BackgroundDimming, value => BackgroundDimming = value);
+        AddPercentSlider("Прозрачность элементов", ElementTransparency, value => ElementTransparency = value);
+
+        void AddPercentSlider(string title, int initial, Action<int> change)
+        {
+            var label = new TextBlock { Text = $"{title} · {initial}%", FontSize = 13, Margin = new Thickness(0,10,0,2) };
+            root.Children.Add(label);
+            var slider = new Slider { Style = sliderStyle, Background = Brush("#607DAD"), Maximum = 100,
+                Value = initial, TickFrequency = 1, IsSnapToTickEnabled = true, IsMoveToPointEnabled = true, Height = 24 };
+            System.Windows.Automation.AutomationProperties.SetName(slider, title);
+            slider.ValueChanged += (_, _) =>
+            {
+                var value = (int)slider.Value;
+                change(value);
+                label.Text = $"{title} · {value}%";
+                preview(colors);
+            };
+            root.Children.Add(slider);
+        }
         feedback.FontSize=12;feedback.Foreground=Brush("#B7C2D8");feedback.Margin=new Thickness(0,12,0,12);
         root.Children.Add(feedback);
         var footer=new System.Windows.Controls.Primitives.UniformGrid{Columns=2};
         var cancel=MakeButton("Отмена",()=>Close());cancel.Margin=new Thickness(0,0,10,0);
         footer.Children.Add(cancel);
-        var confirm=MakeButton("Сохранить тему",()=>{save(new(colors));Saved=true;Close();});
+        var confirm=MakeButton("Сохранить тему", () =>
+        {
+            try { save(Colors, BackgroundImage); Close(); }
+            catch (Exception error) when (MainWindow.IsImageError(error)) { feedback.Text = "Не удалось сохранить фон. " + error.Message; }
+        });
         confirm.Background=Brush("#315B92");footer.Children.Add(confirm);root.Children.Add(footer);
         SelectColor("Accent");
     }

@@ -50,7 +50,7 @@
    <Grid Grid.Column="1" Margin="32,24,32,28">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid Background="Transparent" MouseLeftButtonDown="DragHeader">
-     <TextBlock Text="Установка" FontSize="13" Foreground="#ACA4B1" VerticalAlignment="Center"/>
+     <TextBlock x:Name="ModeLabel" Text="Установка" FontSize="13" Foreground="#ACA4B1" VerticalAlignment="Center"/>
      <Button x:Name="CloseButton" Content="×" HorizontalAlignment="Right" Padding="12,4" FontSize="22" Click="CloseSetup"/>
     </Grid>
     <StackPanel Grid.Row="1" Margin="0,30,0,0">
