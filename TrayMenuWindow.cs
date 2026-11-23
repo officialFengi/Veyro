@@ -14,7 +14,7 @@ internal sealed class TrayMenuWindow : Window
 {
     private bool closing;
     private bool actionQueued;
-    internal TrayMenuWindow(Preferences preferences, Action open, Action exit)
+    internal TrayMenuWindow(Preferences preferences, Action open, Action checkUpdates, Action exit)
     {
         var palette=ThemePalette.Resolve(preferences.Theme, preferences.CustomColors);
         SolidColorBrush ColorAt(int index)=>(SolidColorBrush)new BrushConverter().ConvertFromString(palette[index])!;
@@ -36,6 +36,7 @@ internal sealed class TrayMenuWindow : Window
         Button Row(string title,string glyph,Action action)
         {
             var button=new Button { Height=44,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Cursor=Cursors.Hand,FocusVisualStyle=null };
+            System.Windows.Automation.AutomationProperties.SetName(button, title);
             var border=new FrameworkElementFactory(typeof(Border));
             border.Name="Surface";
             border.SetValue(Border.CornerRadiusProperty,new CornerRadius(10));
@@ -69,6 +70,7 @@ internal sealed class TrayMenuWindow : Window
             return button;
         }
         stack.Children.Add(Row("Открыть Veyro","\uE8A7",open));
+        stack.Children.Add(Row("Проверить обновления","\uE895",checkUpdates));
         stack.Children.Add(new Border { Height=1,Background=ColorAt(2),Margin=new Thickness(14,5,14,5) });
         stack.Children.Add(Row("Выйти","\uE7E8",exit));
         Closing += (_, _) => closing = true;

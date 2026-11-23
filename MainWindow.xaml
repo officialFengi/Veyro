@@ -171,6 +171,7 @@
         </Style>
 
         <DataTemplate x:Key="MixerRow">
+            <StackPanel>
             <Grid x:Name="ChannelRow" Height="84" Margin="0,0,0,29" MouseRightButtonUp="ShowSorting">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="358"/>
@@ -182,8 +183,9 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="58"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Button Width="48" Height="48" Background="Transparent" Click="ToggleMute"
+                        <Button Width="48" Height="48" Background="Transparent" Click="ToggleMute" IsEnabled="{Binding IsAvailable}"
                                 ToolTip="{Binding MuteHint}" AutomationProperties.Name="{Binding MuteHint}">
                             <Grid Width="42" Height="42">
                                 <Image Source="{Binding Icon}" Width="40" Height="40"/>
@@ -197,16 +199,28 @@
                             <TextBlock PreviewMouseLeftButtonDown="BeginReorder" PreviewMouseMove="MoveReorder" PreviewMouseLeftButtonUp="FinishReorder" LostMouseCapture="CancelReorder" PreviewMouseWheel="ScrollReorder" Cursor="Hand" x:Name="ChannelName" Text="{Binding Name}" ToolTip="{Binding Name}" MouseLeftButtonUp="ToggleGroup"
                                        FontSize="28" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
+                        <Button x:Name="EqButton" Grid.Column="2" Width="46" Height="46" Margin="6,0,-9,0"
+                                Background="Transparent" Click="ToggleEqualizer" Visibility="Collapsed"
+                                ToolTip="Эквалайзер приложения" AutomationProperties.Name="{Binding Name, StringFormat='Эквалайзер — {0}'}">
+                            <Path Stroke="{DynamicResource Accent}" StrokeThickness="3" StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" Data="M 1,12 L 1,19 M 7,4 L 7,23 M 13,9 L 13,20 M 19,1 L 19,16"/>
+                        </Button>
                     </Grid>
                 </Border>
                 <Border x:Name="DropMarker" Grid.ColumnSpan="3" Height="3" Background="{DynamicResource Accent}" VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"/>
                 <Border x:Name="DeviceDivider" Grid.ColumnSpan="3" Height="1" Background="{DynamicResource Stroke}"
                         VerticalAlignment="Bottom" Margin="20,0,20,-20" Visibility="Collapsed" IsHitTestVisible="False"/>
                 <local:VolumeSlider Grid.Column="2" Style="{StaticResource VolumeSlider}"
+                                    IsEnabled="{Binding IsAvailable}"
                                     Value="{Binding Volume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                     AutomationProperties.Name="{Binding Name}" PreviewMouseWheel="AdjustWithWheel"/>
             </Grid>
+            <Border x:Name="EqHost" Visibility="Collapsed"/>
+            </StackPanel>
             <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding HasEqualizer}" Value="True">
+                    <Setter TargetName="EqButton" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
                 <DataTrigger Binding="{Binding IsOutput}" Value="True">
                     <Setter TargetName="DeviceCaption" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="ChannelLabel" Property="Background" Value="Transparent"/>

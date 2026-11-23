@@ -14,16 +14,22 @@ internal sealed class TrayHost
     private readonly Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
     private readonly ShortcutRegistration shortcut = new();
     private Process? worker;
+    private UpdateNotifier? updates;
     private long request;
     private string savedView = "null";
 
     [STAThread]
-    private static void Main(string[] args)
+    private static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--check-update")
+            return ReleaseCheck.RunAsync().GetAwaiter().GetResult();
+        if (args.Length == 2 && args[0] == "--install-update")
+            return UpdateDownloadWindow.Run(args[1]);
         if (args.Length == 2 && args[0] == "--mixer-ui" && Console.IsInputRedirected)
             new MixerWorker(args[1] == "bound").Run();
         else
             new TrayHost().Run();
+        return 0;
     }
 
     private void Run()
@@ -33,12 +39,14 @@ internal sealed class TrayHost
         using var tray = new Forms.NotifyIcon { Text = "Veyro — микшер громкости", Icon = icon, Visible = true };
         var settings = Preferences.Load();
         if (settings.ShortcutKey != 0) shortcut.TrySet(settings.ShortcutKey, settings.ShortcutModifiers);
+        if (System.Linq.Enumerable.Any(settings.Equalizers!.Values, p => p.CableId is not null)) StartWorker();
         shortcut.Pressed += () => Send("hotkey");
         tray.MouseClick += (_, e) =>
         {
             if (e.Button == Forms.MouseButtons.Left) Send("toggle");
             if (e.Button == Forms.MouseButtons.Right) Send("menu");
         };
+        using var notifier = updates = new UpdateNotifier(dispatcher);
         try { Dispatcher.Run(); }
         finally
         {
@@ -50,16 +58,24 @@ internal sealed class TrayHost
     [DllImport("user32.dll")]
     private static extern bool AllowSetForegroundWindow(int processId);
 
-    private Process StartWorker()
+    internal static ProcessStartInfo ChildProcess(string command)
     {
         var start = new ProcessStartInfo(Environment.ProcessPath!)
         {
-            UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true,
-            StandardInputEncoding = new System.Text.UTF8Encoding(false), StandardOutputEncoding = System.Text.Encoding.UTF8
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true,
+            StandardOutputEncoding = System.Text.Encoding.UTF8
         };
         if (string.Equals(Path.GetFileNameWithoutExtension(start.FileName), "dotnet", StringComparison.OrdinalIgnoreCase))
             start.ArgumentList.Add(Environment.GetCommandLineArgs()[0]);
-        start.ArgumentList.Add("--mixer-ui");
+        start.ArgumentList.Add(command);
+        return start;
+    }
+
+    private Process StartWorker()
+    {
+        var start = ChildProcess("--mixer-ui");
+        start.RedirectStandardInput = true;
+        start.StandardInputEncoding = new System.Text.UTF8Encoding(false);
         start.ArgumentList.Add(shortcut.IsRegistered ? "bound" : "unbound");
         var child = new Process { StartInfo = start };
         child.OutputDataReceived += (_, e) => dispatcher.BeginInvoke(new Action(() => Receive(child, e.Data)));
@@ -119,6 +135,7 @@ internal sealed class TrayHost
                 worker = null;
                 child.StandardInput.Close();
             }
+            else if (line == "check-updates") updates?.CheckNow();
             else if (line == "exit") dispatcher.BeginInvokeShutdown(DispatcherPriority.Normal);
         }
         catch (IOException) { worker = null; }

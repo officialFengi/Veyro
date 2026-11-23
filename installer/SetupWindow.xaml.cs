@@ -9,25 +9,28 @@ namespace VeyroSetup;
 public partial class SetupWindow : Window
 {
     private readonly bool updating;
+    private readonly bool inAppUpdate;
     private bool installing;
     private bool installed;
     private string? installedPath;
-    public SetupWindow()
+    public SetupWindow(string? sourceDirectory = null)
     {
         InitializeComponent();
         var existing = Installer.InstalledDirectory();
-        updating = existing is not null;
-        InstallPath.Text = existing ?? Installer.DefaultDirectory;
+        inAppUpdate = sourceDirectory is not null;
+        updating = inAppUpdate || existing is not null;
+        InstallPath.Text = sourceDirectory ?? existing ?? Installer.DefaultDirectory;
         if (updating)
         {
             Title = "Обновление Veyro";
             ModeLabel.Text = "Обновление";
             Heading.Text = "Обновить установленный Veyro";
-            Description.Text = $"Папка приложения — {existing}\nНастройки, автозапуск и ярлыки сохранятся.";
+            Description.Text = $"Папка приложения — {InstallPath.Text}\nНастройки, автозапуск и ярлыки сохранятся.";
             InstallButton.Content = "Обновить Veyro  →";
             Options.Visibility = Visibility.Collapsed;
         }
         Closing += (_, e) => e.Cancel = installing;
+        if (inAppUpdate) ContentRendered += async (_, _) => await InstallAsync();
     }
     private void DragHeader(object sender, MouseButtonEventArgs e) { if (e.OriginalSource is System.Windows.Controls.TextBlock) DragMove(); }
     private void CloseSetup(object sender, RoutedEventArgs e) => Close();
@@ -37,11 +40,14 @@ public partial class SetupWindow : Window
         if (picker.ShowDialog() == Forms.DialogResult.OK) InstallPath.Text = picker.SelectedPath;
     }
     private async void Install(object sender, RoutedEventArgs e)
+        => await InstallAsync();
+
+    private async Task InstallAsync()
     {
+        if (installing) return;
         if (installed)
         {
-            try { Process.Start(new ProcessStartInfo(installedPath!) { UseShellExecute = true }); Close(); }
-            catch (Exception error) { ErrorText.Text = error.Message; }
+            LaunchApp();
             return;
         }
         installing = true;
@@ -65,7 +71,7 @@ public partial class SetupWindow : Window
         });
         try
         {
-            installedPath = await Task.Run(() => Installer.Install(directory, updating, autostart, desktop, progress));
+            installedPath = await Task.Run(() => Installer.Install(directory, updating, autostart, desktop, progress, inAppUpdate));
             installed = true;
             Heading.Text = updating ? "Veyro обновлён" : "Veyro установлен";
             Description.Text = "Откройте микшер через значок в области уведомлений.";
@@ -92,6 +98,17 @@ public partial class SetupWindow : Window
             Options.IsEnabled = true;
             CloseButton.IsEnabled = true;
         }
+        if (inAppUpdate && installed) LaunchApp();
+    }
+
+    private void LaunchApp()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(installedPath!) { UseShellExecute = false })!.Dispose();
+            Close();
+        }
+        catch (Exception error) { ErrorText.Text = error.Message; }
     }
 }
 

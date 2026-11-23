@@ -1,0 +1,68 @@
+<UserControl x:Class="Veyro.EqualizerEditor" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:Veyro"
+    Foreground="{DynamicResource Ink}">
+    <UserControl.Resources>
+        <Style x:Key="BandSlider" TargetType="Slider">
+            <Setter Property="Orientation" Value="Vertical"/>
+            <Setter Property="Minimum" Value="-12"/><Setter Property="Maximum" Value="12"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="IsSnapToTickEnabled" Value="True"/><Setter Property="TickFrequency" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Background="Transparent" Cursor="SizeNS">
+                            <Track x:Name="PART_Track" Orientation="Vertical">
+                                <Track.DecreaseRepeatButton><RepeatButton Opacity="0" Focusable="False" Command="Slider.DecreaseLarge"/></Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton><RepeatButton Opacity="0" Focusable="False" Command="Slider.IncreaseLarge"/></Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Height="21" Width="21">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Fill="{DynamicResource Panel}" Stroke="{DynamicResource Accent}" StrokeThickness="4"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                            <Border x:Name="FocusRing" Visibility="Collapsed" CornerRadius="10" BorderThickness="1"
+                                BorderBrush="{DynamicResource Accent}" IsHitTestVisible="False"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="FocusRing" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Stroke}" BorderThickness="1"
+            CornerRadius="25" Padding="24,16,24,18" Margin="0,0,0,24">
+        <StackPanel>
+            <DockPanel LastChildFill="True">
+                <Button x:Name="Bypass" DockPanel.Dock="Right" Click="ToggleBypass" MinWidth="108" Height="42" FontSize="18"
+                    Background="{DynamicResource ElementPanel}" ToolTip="Сравнить звучание с обработкой и без неё"/>
+                <TextBlock Text="Эквалайзер" FontWeight="SemiBold" FontSize="26" VerticalAlignment="Center"/>
+            </DockPanel>
+            <UniformGrid x:Name="Readouts" Rows="1" Margin="0,12,0,0"/>
+            <local:BandGraph x:Name="Plot" Height="124"/>
+            <UniformGrid x:Name="Labels" Rows="1"/>
+            <DockPanel Margin="0,16,0,0">
+                <Button DockPanel.Dock="Right" Content="Маршрут" Click="ToggleRouting" Width="125"
+                    Height="44" FontSize="18" Background="{DynamicResource ElementPanel}"/>
+                <StackPanel x:Name="Presets" Orientation="Horizontal"/>
+            </DockPanel>
+            <TextBlock x:Name="State" Margin="2,10,0,0" FontSize="17" TextWrapping="Wrap" Foreground="{DynamicResource Secondary}"/>
+            <StackPanel x:Name="Routing" Visibility="Collapsed" Margin="0,14,0,0">
+                <TextBlock Text="Выберите отдельный VB-CABLE или свободный S/PDIF без подключённой акустики. Назначьте этот же выход приложению в микшере Windows. Звук вернётся в наушники или колонки по умолчанию."
+                    TextWrapping="Wrap" FontSize="18" Foreground="{DynamicResource Ink}"/>
+                <StackPanel x:Name="Cables" Margin="0,8,0,0"/>
+                <WrapPanel>
+                    <Button Content="Микшер Windows" Click="OpenWindowsMixer" Padding="6" Width="190" Height="43" FontSize="17" Margin="0,4,8,0"/>
+                    <Button Content="Обновить список" Click="RefreshCableList" Width="176" Height="43" FontSize="17" Margin="0,4,0,0"/>
+                </WrapPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

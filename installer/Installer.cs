@@ -26,24 +26,32 @@ internal static class Installer
         return File.Exists(Path.Combine(DefaultDirectory, "Veyro.exe")) ? DefaultDirectory : null;
     }
 
-    internal static string Install(string directory, bool updating, bool autostart, bool desktop, IProgress<string> progress)
+    internal static string Install(string directory, bool updating, bool autostart, bool desktop, IProgress<string> progress, bool inAppUpdate = false)
     {
         directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory.Trim()));
         if (directory == Path.GetPathRoot(directory)) throw new IOException("Выберите отдельную папку для приложения.");
         using var mutex = new System.Threading.Mutex(false, @"Local\Veyro.Setup");
         if (!mutex.WaitOne(0)) throw new IOException("Другая установка Veyro уже выполняется.");
-        try { return InstallCore(directory, updating, autostart, desktop, progress); }
+        try { return InstallCore(directory, updating, autostart, desktop, progress, inAppUpdate); }
         finally { mutex.ReleaseMutex(); }
     }
 
-    private static string InstallCore(string directory, bool updating, bool autostart, bool desktop, IProgress<string> progress)
+    private static string InstallCore(string directory, bool updating, bool autostart, bool desktop, IProgress<string> progress, bool inAppUpdate)
     {
         var previousDirectory = InstalledDirectory();
-        if (updating != (previousDirectory is not null) ||
-            (updating && !string.Equals(previousDirectory, directory, StringComparison.OrdinalIgnoreCase)))
+        bool registered = string.Equals(previousDirectory, directory, StringComparison.OrdinalIgnoreCase);
+        bool portable = inAppUpdate && !registered;
+        if (!inAppUpdate && (updating != (previousDirectory is not null) || (updating && !registered)))
             throw new IOException("Состояние установки изменилось. Откройте установщик снова.");
         using var oldProduct = Registry.CurrentUser.OpenSubKey(ProductKey);
         var appPath = Path.Combine(directory, "Veyro.exe");
+        if (inAppUpdate)
+        {
+            var info = FileVersionInfo.GetVersionInfo(appPath);
+            var current = new Version(info.FileMajorPart, info.FileMinorPart, info.FileBuildPart, info.FilePrivatePart);
+            if (info.OriginalFilename != "Veyro.dll" || current >= typeof(Installer).Assembly.GetName().Version!)
+                throw new IOException("В этой папке нет предыдущей версии Veyro для обновления.");
+        }
         var uninstallPath = Path.Combine(directory, "Uninstall-Veyro.exe");
         var startLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Veyro.lnk");
         var desktopLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Veyro.lnk");
@@ -59,7 +67,8 @@ internal static class Installer
         Directory.CreateDirectory(staging);
         try
         {
-            foreach (var path in updating ? new[] { appPath, uninstallPath } : new[] { appPath, uninstallPath, startLink, desktopLink })
+            var files = portable ? new[] { appPath } : updating ? new[] { appPath, uninstallPath } : new[] { appPath, uninstallPath, startLink, desktopLink };
+            foreach (var path in files)
             {
                 var backup = File.Exists(path) ? Path.Combine(staging, Guid.NewGuid().ToString("N")) : null;
                 if (backup is not null) File.Copy(path, backup);
@@ -71,8 +80,11 @@ internal static class Installer
             {
                 var payload = zip.GetEntry("Veyro.exe") ?? throw new IOException("В установщике отсутствует приложение.");
                 payload.ExtractToFile(Path.Combine(staging, "Veyro.exe"));
-                var removal = zip.GetEntry("Uninstall-Veyro.exe") ?? throw new IOException("В установщике отсутствует программа удаления.");
-                removal.ExtractToFile(Path.Combine(staging, "Uninstall-Veyro.exe"));
+                if (!portable)
+                {
+                    var removal = zip.GetEntry("Uninstall-Veyro.exe") ?? throw new IOException("В установщике отсутствует программа удаления.");
+                    removal.ExtractToFile(Path.Combine(staging, "Uninstall-Veyro.exe"));
+                }
             }
             progress.Report("Обновляем файлы Veyro…");
             foreach (var process in Process.GetProcessesByName("Veyro"))
@@ -82,13 +94,16 @@ internal static class Installer
                     string? processPath;
                     try { processPath = process.MainModule?.FileName; }
                     catch (System.ComponentModel.Win32Exception) { continue; }
+                    catch (InvalidOperationException) when (process.HasExited) { continue; }
                     if (!string.Equals(processPath, appPath, StringComparison.OrdinalIgnoreCase)) continue;
-                    process.Kill();
+                    try { process.Kill(); }
+                    catch (InvalidOperationException) when (process.HasExited) { continue; }
                     if (!process.WaitForExit(5000)) throw new IOException("Закройте Veyro и повторите установку.");
                 }
             }
             File.Move(Path.Combine(staging, "Veyro.exe"), appPath, true);
             changedFiles.Push(appPath);
+            if (portable) return appPath;
             File.Move(Path.Combine(staging, "Uninstall-Veyro.exe"), uninstallPath, true);
             changedFiles.Push(uninstallPath);
             if (!updating)

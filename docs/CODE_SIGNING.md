@@ -34,7 +34,12 @@ by SignPath Foundation”, with links to https://signpath.io and https://signpat
 
 ## Privacy
 
-Veyro does not implement telemetry, an account system or automatic update checks.
+Veyro checks the public GitHub Releases API for updates once a day. The request
+contains no audio settings or account identifiers. When the user accepts the
+update prompt, Veyro streams the installer from that release to disk, checks
+its size, GitHub-provided SHA-256 and file version, then runs the installer
+to update and restart the same copy of Veyro.
+Veyro has no telemetry or account system.
 It reads local Windows audio sessions and changes their volume/output settings.
 Preferences are stored locally at `%LOCALAPPDATA%\Veyro\settings.json`.
 The installer optionally registers Windows startup and desktop shortcuts and

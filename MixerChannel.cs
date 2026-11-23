@@ -9,12 +9,22 @@ internal sealed class MixerChannel(string key, string name, ImageSource? icon) :
 {
     private double volume;
     private bool muted;
+    private bool available = true;
     private Action<float>? writeVolume;
     private Action<bool>? writeMute;
 
     public string Key { get; } = key;
     public string Name { get; } = name;
     public bool IsMuted => muted;
+    public bool HasEqualizer => System.IO.Path.IsPathFullyQualified(Key);
+    public bool IsAvailable => available;
+
+    public void SetAvailable(bool value)
+    {
+        if (value == available) return;
+        available = value;
+        Notify(nameof(IsAvailable));
+    }
     public bool IsOutput => Key == "master" || Key.StartsWith("device:", StringComparison.Ordinal);
     public ImageSource? Icon => muted ? null : icon;
     public string Glyph => muted ? "\uE74F" : icon is null ? "\uE767" : "";

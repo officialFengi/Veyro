@@ -17,6 +17,8 @@ public partial class App : Application
             }
             else new UninstallWindow().Show();
         }
+        else if (e.Args is ["--update", var directory])
+            new SetupWindow(directory).Show();
         else new SetupWindow().Show();
     }
 }

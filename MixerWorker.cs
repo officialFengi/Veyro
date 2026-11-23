@@ -25,6 +25,7 @@ internal sealed class MixerWorker(bool registered) : IMixerShortcut
     internal void Run()
     {
         app.InitializeComponent();
+        if (System.Linq.Enumerable.Any(Preferences.Load().Equalizers!.Values, p => p.CableId is not null)) GetMixer();
         idle.Tick += (_, _) =>
         {
             idle.Stop();
@@ -78,7 +79,8 @@ internal sealed class MixerWorker(bool registered) : IMixerShortcut
         if (parts[2] == "menu")
         {
             menu?.Close();
-            menu = new TrayMenuWindow(mixer?.CurrentSettings ?? Preferences.Load(), () => GetMixer().OpenMixer(), () => Write("exit"));
+            menu = new TrayMenuWindow(mixer?.CurrentSettings ?? Preferences.Load(), () => GetMixer().OpenMixer(),
+                () => Write("check-updates"), () => Write("exit"));
             menu.Closed += (_, _) => { menu = null; ScheduleUnload(); };
             menu.Show();
             return;

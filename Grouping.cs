@@ -67,8 +67,7 @@ public partial class MainWindow
                 groupRows.Add(key, channel);
             }
             var volumes = group.Where(row => apps.ContainsKey(row.Key)).SelectMany(row => apps[row.Key].Volumes).ToList();
-            if (volumes.Count == 0)
-                continue;
+            channel.SetAvailable(volumes.Count > 0);
             groupMembers[channel] = group.ToArray();
             channel.Bind(
                 value => ApplyToSessions(volumes, volume => volume.Volume = value),

@@ -50,6 +50,7 @@ public partial class MainWindow : Window
             else RefreshLevels();
         });
         InitializeComponent();
+        InitializeEqualizer();
         ApplyPreferences();
         MixerRows.ItemsSource = displayedRows;
         PreviewMouseDown += (_, mouse) =>
@@ -85,6 +86,8 @@ public partial class MainWindow : Window
             {
                 timer.Stop();
                 CancelShortcutCapture();
+                CloseEqualizerEditor();
+                FlushEqualizerSave();
                 StopObserving();
                 if (themeStudio is null)
                 {
@@ -104,6 +107,8 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             timer.Stop();
+            FlushEqualizerSave();
+            StopEqualizer();
             StopObserving();
             audio.Dispose();
         };
@@ -141,7 +146,7 @@ public partial class MainWindow : Window
             RefreshLevels();
             Status.Text = apps.Count == 0 ? "Запустите звук в приложении, чтобы оно появилось в микшере." : "";
         }
-        catch (COMException) { Status.Text = "Устройство вывода временно недоступно."; }
+        catch (Exception ex) when (AudioUnavailable(ex)) { Status.Text = "Устройство вывода временно недоступно."; }
     }
 
     private void BindAppRows(Dictionary<string, AppSessions> apps)
@@ -156,6 +161,7 @@ public partial class MainWindow : Window
             }
             app.Channel = row;
             var volumes = app.Volumes;
+            row.SetAvailable(volumes.Count > 0);
             row.Bind(value => ApplyToSessions(volumes, volume => volume.Volume = value),
                 mute => ApplyToSessions(volumes, volume => volume.Mute = mute));
         }
@@ -235,32 +241,20 @@ public partial class MainWindow : Window
 
     private bool ScanSessions(MMDevice device)
     {
-        var manager = device.AudioSessionManager;
-        manager.RefreshSessions();
-        var sessions = manager.Sessions;
         bool changed = cachedSessions is null;
         liveSessionIds.Clear();
-        int count = sessions.Count;
-        for (int i = 0; i < count; i++)
+        changed |= ReadEndpoint(device, null);
+        foreach (var (key, profile) in preferences.Equalizers!)
         {
-            AudioSessionControl? control = null;
+            if (profile.CableId is not { } cableId || cableId == device.ID) continue;
             try
             {
-                control = sessions[i];
-                if (control.State == AudioSessionState.AudioSessionStateExpired) continue;
-                string id = control.GetSessionInstanceIdentifier;
-                liveSessionIds.Add(id);
-                if (watchedSessions.ContainsKey(id)) continue;
-                var info = DescribeSession(control, id);
-                try { control.RegisterEventClient(changes); }
-                catch (COMException) { /* The periodic refresh also reads volume and mute. */ }
-                watchedSessions.Add(id, info);
-                control = null; // The entry owns its notification registration until the session ends.
-                changed = true;
+                using var cable = audio.GetDevice(cableId);
+                if (cable.State == DeviceState.Active) changed |= ReadEndpoint(cable, key);
             }
-            catch (COMException) { /* The session may have ended during enumeration. */ }
-            finally { if (control is not null) DisposeSession(control); }
+            catch (Exception ex) when (AudioUnavailable(ex)) { }
         }
+
         if (!liveSessionIds.SetEquals(watchedSessions.Keys))
         {
             foreach (var id in watchedSessions.Keys.Where(id => !liveSessionIds.Contains(id)).ToArray())
@@ -278,8 +272,49 @@ public partial class MainWindow : Window
                 apps.Add(session.Key, app = new AppSessions(session.Name, session.Executable));
             app.Volumes.Add(session.Control.SimpleAudioVolume);
         }
+        foreach (var (key, profile) in preferences.Equalizers!)
+            if (profile.CableId is not null && !apps.ContainsKey(key))
+                apps.Add(key, new AppSessions(profile.Name, key));
         cachedSessions = apps;
         return true;
+    }
+
+    private bool ReadEndpoint(MMDevice source, string? owner)
+    {
+        bool changed = false;
+        var manager = source.AudioSessionManager;
+        manager.RefreshSessions();
+        var sessions = manager.Sessions;
+        if (sessions is null) throw new InvalidOperationException("Недоступен список аудиосеансов.");
+        int count = sessions.Count;
+        for (int i = 0; i < count; i++)
+        {
+            AudioSessionControl? control = null;
+            try
+            {
+                control = sessions[i];
+                if (control.GetProcessID == Environment.ProcessId) continue;
+                if (control.State == AudioSessionState.AudioSessionStateExpired) continue;
+                string id = control.GetSessionInstanceIdentifier;
+                if (watchedSessions.TryGetValue(id, out var watched))
+                {
+                    if (owner is null || string.Equals(owner, watched.Key, StringComparison.OrdinalIgnoreCase))
+                        liveSessionIds.Add(id);
+                    continue;
+                }
+                var info = DescribeSession(control, id);
+                if (owner is not null && !string.Equals(owner, info.Key, StringComparison.OrdinalIgnoreCase)) continue;
+                liveSessionIds.Add(id);
+                try { control.RegisterEventClient(changes); }
+                catch (COMException) { /* The periodic refresh also reads volume and mute. */ }
+                watchedSessions.Add(id, info);
+                control = null; // The entry owns its notification registration until the session ends.
+                changed = true;
+            }
+            catch (COMException) { /* The session may have ended during enumeration. */ }
+            finally { if (control is not null) DisposeSession(control); }
+        }
+        return changed;
     }
 
     private static WatchedSession DescribeSession(AudioSessionControl session, string id)
@@ -447,7 +482,7 @@ public partial class MainWindow : Window
     }
 
     internal Preferences CurrentSettings => preferences;
-    internal bool CanUnload => !IsVisible && !exiting && themeStudio is null && !saveFailed && !assigningShortcut;
+    internal bool CanUnload => !IsVisible && !exiting && themeStudio is null && !saveFailed && !assigningShortcut && !HasEqualizerRoutes;
 
     internal MixerViewState CaptureView() => new(expandedGroups.ToArray(), SettingsPanel.Visibility == Visibility.Visible,
         settingsView is null ? "" : NewGroupName.Text, folderTarget?.Key, folderTarget?.Name, FolderNameInput.Text,
