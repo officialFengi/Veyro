@@ -11,11 +11,12 @@ namespace Veyro;
 internal sealed class MixerWorker(bool registered) : IMixerShortcut
 {
     private readonly Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
-    private readonly DispatcherTimer idle = new() { Interval = TimeSpan.FromSeconds(30) };
+    private readonly DispatcherTimer idle = new();
     private readonly StreamWriter reply = new(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true };
     private readonly App app = new();
     private MainWindow? mixer;
     private TrayMenuWindow? menu;
+    private UpdateOfferWindow? updateResult;
     private MixerViewState? savedView;
     private long lastRequest;
     private int bindingTicket;
@@ -26,12 +27,7 @@ internal sealed class MixerWorker(bool registered) : IMixerShortcut
     {
         app.InitializeComponent();
         if (System.Linq.Enumerable.Any(Preferences.Load().Equalizers!.Values, p => p.CableId is not null)) GetMixer();
-        idle.Tick += (_, _) =>
-        {
-            idle.Stop();
-            if (menu is null && (mixer is null || mixer.CanUnload))
-                Write($"idle {lastRequest} " + JsonSerializer.Serialize(mixer?.CaptureView() ?? savedView));
-        };
+        idle.Tick += (_, _) => RequestUnload();
         // A pipe read must not occupy the WPF dispatcher, including during a binding change.
         _ = Task.Run(ReadCommands);
         app.Run();
@@ -76,6 +72,11 @@ internal sealed class MixerWorker(bool registered) : IMixerShortcut
         }
         if (parts.Length != 3 || parts[0] != "show" || !long.TryParse(parts[1], out lastRequest)) return;
         idle.Stop();
+        if (parts[2] is "update-current" or "update-check-failed")
+        {
+            ShowUpdateResult(parts[2] == "update-current");
+            return;
+        }
         if (parts[2] == "menu")
         {
             menu?.Close();
@@ -105,7 +106,37 @@ internal sealed class MixerWorker(bool registered) : IMixerShortcut
     private void ScheduleUnload()
     {
         idle.Stop();
-        if (menu is null && (mixer is null || mixer.CanUnload)) idle.Start();
+        if (!CanUnload) return;
+        idle.Interval = TimeSpan.FromSeconds(mixer is null ? 5 : 30);
+        idle.Start();
+    }
+
+    private bool CanUnload => menu is null && updateResult is null && (mixer is null || mixer.CanUnload);
+
+    private void RequestUnload()
+    {
+        idle.Stop();
+        if (CanUnload) Write($"idle {lastRequest} " + JsonSerializer.Serialize(mixer?.CaptureView() ?? savedView));
+    }
+
+    private void ShowUpdateResult(bool current)
+    {
+        if (updateResult is null)
+        {
+            updateResult = UpdateOfferWindow.CreateResult(current, mixer?.CurrentSettings);
+            updateResult.Closed += (_, _) =>
+            {
+                updateResult = null;
+                if (mixer is null) RequestUnload();
+                else ScheduleUnload();
+            };
+            updateResult.Show();
+        }
+        else
+        {
+            updateResult.SetResult(current);
+            updateResult.Activate();
+        }
     }
 
     private void Write(string message)

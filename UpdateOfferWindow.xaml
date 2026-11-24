@@ -4,7 +4,7 @@
         Title="Обновление Veyro" Icon="/Veyro;component/assets/app.ico"
         Width="448" SizeToContent="Height" WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        FontFamily="Segoe UI" Foreground="{DynamicResource Ink}" UseLayoutRounding="True">
+        FontFamily="Segoe UI" Foreground="{DynamicResource Ink}" UseLayoutRounding="True" PreviewKeyDown="HandleKey">
     <Window.Resources>
         <Style TargetType="Button">
             <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
@@ -32,6 +32,56 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <DataTemplate x:Key="OfferTemplate">
+            <StackPanel>
+                <TextBlock Text="Доступно обновление" FontSize="29" FontWeight="SemiBold" Margin="0,20,0,16"/>
+                <Border Background="{DynamicResource Surface}" CornerRadius="12" Padding="18,13">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="42"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Установлено" FontSize="12" Foreground="{DynamicResource Secondary}"/>
+                            <TextBlock Text="{Binding Installed}" FontSize="21" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" FontFamily="Segoe MDL2 Assets" Text="&#xE72A;" FontSize="16"
+                                   HorizontalAlignment="Left" VerticalAlignment="Center" Foreground="{DynamicResource Secondary}"/>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Новая версия" FontSize="12" Foreground="{DynamicResource Secondary}"/>
+                            <TextBlock Text="{Binding Available}" FontSize="21" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <TextBlock Text="Veyro скачает обновление и перезапустится. Настройки микшера и эквалайзера сохранятся."
+                           Foreground="{DynamicResource Secondary}" TextWrapping="Wrap" FontSize="14" LineHeight="21" Margin="0,16,0,22"/>
+                <Grid Height="42">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="3*"/></Grid.ColumnDefinitions>
+                    <Button Content="Позже" IsCancel="True" Click="Dismiss"/>
+                    <Button Grid.Column="2" Content="Обновить Veyro" IsDefault="True" Background="{DynamicResource Accent}"
+                            Foreground="{DynamicResource OnAccent}" Click="Accept"/>
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="ResultTemplate">
+            <StackPanel>
+                <Grid Margin="0,24,0,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="48"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <Border Width="48" Height="48" VerticalAlignment="Top" CornerRadius="15" Background="{DynamicResource Surface}">
+                        <TextBlock Text="{Binding Glyph}" FontFamily="Segoe MDL2 Assets" FontSize="22"
+                                   Foreground="{DynamicResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Heading}" Foreground="{DynamicResource Ink}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Description}" Foreground="{DynamicResource Secondary}" FontSize="14"
+                                   TextWrapping="Wrap" LineHeight="20" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Grid>
+                <Button Content="Готово" HorizontalAlignment="Right" Width="116" Height="38" IsDefault="True"
+                        Background="{DynamicResource Accent}" Foreground="{DynamicResource OnAccent}" Click="Dismiss"/>
+            </StackPanel>
+        </DataTemplate>
     </Window.Resources>
     <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Stroke}" BorderThickness="1" CornerRadius="20">
         <StackPanel Margin="26,17,26,24">
@@ -44,30 +94,7 @@
                 <Button Grid.Column="1" Background="Transparent" Foreground="{DynamicResource Secondary}" Click="Dismiss"
                         AutomationProperties.Name="Закрыть" ToolTip="Закрыть" FontFamily="Segoe MDL2 Assets" FontSize="13" Content="&#xE8BB;"/>
             </Grid>
-            <TextBlock Text="Доступно обновление" FontSize="29" FontWeight="SemiBold" Margin="0,20,0,16"/>
-            <Border Background="{DynamicResource Surface}" CornerRadius="12" Padding="18,13">
-                <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="42"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="Установлено" FontSize="12" Foreground="{DynamicResource Secondary}"/>
-                        <TextBlock x:Name="Installed" FontSize="21" FontWeight="SemiBold" Margin="0,2,0,0"/>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" FontFamily="Segoe MDL2 Assets" Text="&#xE72A;" FontSize="16"
-                               HorizontalAlignment="Left" VerticalAlignment="Center" Foreground="{DynamicResource Secondary}"/>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Новая версия" FontSize="12" Foreground="{DynamicResource Secondary}"/>
-                        <TextBlock x:Name="Available" FontSize="21" FontWeight="SemiBold" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-            <TextBlock Text="Veyro скачает обновление и перезапустится. Настройки микшера и эквалайзера сохранятся."
-                       Foreground="{DynamicResource Secondary}" TextWrapping="Wrap" FontSize="14" LineHeight="21" Margin="0,16,0,22"/>
-            <Grid Height="42">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="3*"/></Grid.ColumnDefinitions>
-                <Button Content="Позже" IsCancel="True" Click="Dismiss"/>
-                <Button Grid.Column="2" Content="Обновить Veyro" IsDefault="True" Background="{DynamicResource Accent}"
-                        Foreground="{DynamicResource OnAccent}" Click="Accept"/>
-            </Grid>
+            <ContentPresenter x:Name="Body"/>
         </StackPanel>
     </Border>
 </Window>

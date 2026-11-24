@@ -14,13 +14,15 @@ internal sealed class UpdateNotifier : IDisposable
     private static readonly TimeSpan RetryInterval = TimeSpan.FromMinutes(30);
     private readonly string stamp = Path.Combine(Path.GetDirectoryName(Preferences.FilePath)!, "last-update-check");
     private readonly DispatcherTimer timer;
+    private readonly Action<string> showResult;
     private bool disposed;
     private bool checking;
     private bool reportResult;
     private Process? offer;
 
-    internal UpdateNotifier(Dispatcher dispatcher)
+    internal UpdateNotifier(Dispatcher dispatcher, Action<string> showResult)
     {
+        this.showResult = showResult;
         timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher);
         timer.Tick += ScheduledCheck;
         Schedule(TimeSpan.FromSeconds(30));
@@ -58,7 +60,7 @@ internal sealed class UpdateNotifier : IDisposable
                 if (disposed) return;
                 if (child.ExitCode != 0)
                 {
-                    Report("Не удалось проверить обновления на GitHub. Попробуйте позже.");
+                    Report("update-check-failed");
                     return;
                 }
             }
@@ -99,8 +101,7 @@ internal sealed class UpdateNotifier : IDisposable
             }
             else
             {
-                var version = typeof(UpdateNotifier).Assembly.GetName().Version!.ToString(3);
-                Report($"У вас актуальная версия Veyro {version}.");
+                Report("update-current");
             }
             delay = CheckInterval;
             try
@@ -112,7 +113,7 @@ internal sealed class UpdateNotifier : IDisposable
         }
         catch (Exception error) when (error is Win32Exception or IOException or InvalidOperationException)
         {
-            Report("Не удалось проверить обновления. " + error.Message);
+            Report("update-check-failed");
         }
         finally
         {
@@ -122,10 +123,10 @@ internal sealed class UpdateNotifier : IDisposable
         }
     }
 
-    private void Report(string message)
+    private void Report(string command)
     {
         if (reportResult && !disposed)
-            Forms.MessageBox.Show(message, "Обновления Veyro", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+            showResult(command);
     }
 
     private void Schedule(TimeSpan delay)

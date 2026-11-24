@@ -52,7 +52,7 @@ internal sealed class TrayHost
             if (e.Button == Forms.MouseButtons.Left) Send("toggle");
             if (e.Button == Forms.MouseButtons.Right) Send("menu");
         };
-        using var notifier = updates = new UpdateNotifier(dispatcher);
+        using var notifier = updates = new UpdateNotifier(dispatcher, Send);
         try { Dispatcher.Run(); }
         finally
         {
