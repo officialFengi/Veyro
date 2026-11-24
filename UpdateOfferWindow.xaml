@@ -1,0 +1,73 @@
+<Window x:Class="Veyro.UpdateOfferWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Обновление Veyro" Icon="/Veyro;component/assets/app.ico"
+        Width="448" SizeToContent="Height" WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        FontFamily="Segoe UI" Foreground="{DynamicResource Ink}" UseLayoutRounding="True">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Plate" CornerRadius="10" Background="{TemplateBinding Background}">
+                            <Grid>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                                <Border x:Name="FocusRing" Margin="3" CornerRadius="7" BorderThickness="1"
+                                        BorderBrush="{TemplateBinding Foreground}" Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Plate" Property="Opacity" Value=".86"/></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Plate" Property="Opacity" Value=".74"/></Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusRing" Property="Visibility" Value="Visible"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Stroke}" BorderThickness="1" CornerRadius="20">
+        <StackPanel Margin="26,17,26,24">
+            <Grid Height="34">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="34"/></Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Background="Transparent" MouseLeftButtonDown="DragHeader">
+                    <Image Source="/Veyro;component/assets/app.ico" Width="28" Height="28" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="Veyro" FontSize="17" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <Button Grid.Column="1" Background="Transparent" Foreground="{DynamicResource Secondary}" Click="Dismiss"
+                        AutomationProperties.Name="Закрыть" ToolTip="Закрыть" FontFamily="Segoe MDL2 Assets" FontSize="13" Content="&#xE8BB;"/>
+            </Grid>
+            <TextBlock Text="Доступно обновление" FontSize="29" FontWeight="SemiBold" Margin="0,20,0,16"/>
+            <Border Background="{DynamicResource Surface}" CornerRadius="12" Padding="18,13">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="42"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Установлено" FontSize="12" Foreground="{DynamicResource Secondary}"/>
+                        <TextBlock x:Name="Installed" FontSize="21" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" FontFamily="Segoe MDL2 Assets" Text="&#xE72A;" FontSize="16"
+                               HorizontalAlignment="Left" VerticalAlignment="Center" Foreground="{DynamicResource Secondary}"/>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Новая версия" FontSize="12" Foreground="{DynamicResource Secondary}"/>
+                        <TextBlock x:Name="Available" FontSize="21" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            <TextBlock Text="Veyro скачает обновление и перезапустится. Настройки микшера и эквалайзера сохранятся."
+                       Foreground="{DynamicResource Secondary}" TextWrapping="Wrap" FontSize="14" LineHeight="21" Margin="0,16,0,22"/>
+            <Grid Height="42">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="3*"/></Grid.ColumnDefinitions>
+                <Button Content="Позже" IsCancel="True" Click="Dismiss"/>
+                <Button Grid.Column="2" Content="Обновить Veyro" IsDefault="True" Background="{DynamicResource Accent}"
+                        Foreground="{DynamicResource OnAccent}" Click="Accept"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>

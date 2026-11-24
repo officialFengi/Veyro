@@ -23,6 +23,12 @@ internal sealed class TrayHost
     {
         if (args.Length == 1 && args[0] == "--check-update")
             return ReleaseCheck.RunAsync().GetAwaiter().GetResult();
+        if (args.Length == 2 && args[0] == "--confirm-update")
+        {
+            if (new UpdateOfferWindow(args[1]).ShowDialog() == true)
+                Console.WriteLine("install");
+            return 0;
+        }
         if (args.Length == 2 && args[0] == "--install-update")
             return UpdateDownloadWindow.Run(args[1]);
         if (args.Length == 2 && args[0] == "--mixer-ui" && Console.IsInputRedirected)

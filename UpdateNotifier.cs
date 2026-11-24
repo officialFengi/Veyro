@@ -17,6 +17,7 @@ internal sealed class UpdateNotifier : IDisposable
     private bool disposed;
     private bool checking;
     private bool reportResult;
+    private Process? offer;
 
     internal UpdateNotifier(Dispatcher dispatcher)
     {
@@ -63,10 +64,23 @@ internal sealed class UpdateNotifier : IDisposable
             }
             if (tag.Length > 0)
             {
-                var answer = Forms.MessageBox.Show(
-                    $"Доступна новая версия Veyro {tag}. Скачать обновление и перезапустить Veyro? Ваши настройки сохранятся.",
-                    "Обновление Veyro", Forms.MessageBoxButtons.YesNo, Forms.MessageBoxIcon.Information);
-                if (answer == Forms.DialogResult.Yes)
+                var prompt = TrayHost.ChildProcess("--confirm-update");
+                prompt.ArgumentList.Add(tag);
+                bool accepted;
+                using (var window = Process.Start(prompt)!)
+                {
+                    offer = window;
+                    try
+                    {
+                        var choice = await window.StandardOutput.ReadToEndAsync();
+                        await window.WaitForExitAsync();
+                        if (disposed) return;
+                        if (window.ExitCode != 0) throw new InvalidOperationException("Не удалось открыть окно обновления.");
+                        accepted = choice.Trim() == "install";
+                    }
+                    finally { offer = null; }
+                }
+                if (accepted)
                 {
                     var start = TrayHost.ChildProcess("--install-update");
                     start.ArgumentList.Add(tag);
@@ -125,5 +139,6 @@ internal sealed class UpdateNotifier : IDisposable
         disposed = true;
         timer.Stop();
         timer.Tick -= ScheduledCheck;
+        if (offer is { HasExited: false }) offer.CloseMainWindow();
     }
 }
